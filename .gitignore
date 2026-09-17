@@ -1,0 +1,10 @@
+# Only pkmn_shwdn/ is tracked in this repo
+/wordle/
+
+.venv/
+__pycache__/
+node_modules/
+.env
+videos/
+logs/
+*.log
