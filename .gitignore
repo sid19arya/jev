@@ -5,6 +5,6 @@
 __pycache__/
 node_modules/
 .env
-videos/
-logs/
+/pkmn_shwdn/videos/*
+!/pkmn_shwdn/videos/*.mp4
 *.log
