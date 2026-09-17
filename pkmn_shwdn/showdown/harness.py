@@ -43,7 +43,42 @@ STATE_JS = r"""
   const lines = [...room.$el[0].querySelectorAll('.battle-log .inner > *')]
     .map(e => e.textContent.trim()).filter(Boolean);
   const controls = room.$el[0].querySelector('.battle-controls');
+
+  // Type-effectiveness multipliers vs the opposing active Pokemon, from the client's own type chart.
+  const chart = window.BattleTypeChart || {};
+  const eff = (atk, defTypes) => defTypes.reduce((m, t) => {
+    const d = (chart[t.toLowerCase()] || chart[t] || {}).damageTaken || {};
+    return m * ({0: 1, 1: 2, 2: 0.5, 3: 0}[d[atk]] ?? 1);
+  }, 1);
+  const oppP = b.farSide.active[0], oppTypes = oppP ? types(oppP) : [];
+  const matchups = {oppTypes, moves: {}, teraDefense: null, activeTakes: {}, switches: {}};
+  if (req && oppP) {
+    const act = (req.active || [])[0];
+    if (act) act.moves.forEach((m, i) => {
+      const mv = Dex.moves.get(m.id);
+      matchups.moves[i + 1] = mv.category === 'Status' ? null : eff(mv.type, oppTypes);
+    });
+    const takes = (defTypes) => Object.fromEntries(oppTypes.map(t => [t, eff(t, defTypes)]));
+    const me = b.mySide.active[0];
+    if (me) matchups.activeTakes = takes(types(me));
+    if (act && act.canTerastallize) matchups.teraDefense = takes([act.canTerastallize]);
+    req.side.pokemon.forEach((p, i) => {
+      if (p.active) return;
+      let memberTypes = [];
+      try { memberTypes = Dex.species.get(p.details.split(',')[0]).types; } catch (e) {}
+      let best = null;
+      p.moves.forEach(id => {
+        const mv = Dex.moves.get(id);
+        if (mv.category === 'Status' || !mv.basePower) return;
+        const mult = eff(mv.type, oppTypes);
+        if (!best || mult * mv.basePower > best.mult * best.bp) best = {name: mv.name, mult, bp: mv.basePower};
+      });
+      matchups.switches[i] = {takes: takes(memberTypes), best};
+    });
+  }
+
   return {
+    matchups,
     turn: b.turn, ended: !!b.ended, rqid: req && req.rqid,
     ready: !!(controls && controls.querySelector(
       'button[name=chooseMove]:not([disabled]), button[name=chooseSwitch]:not(.disabled):not([disabled])')),

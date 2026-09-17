@@ -1,0 +1,9 @@
+{
+  "name": "pkmn-shwdn-jev-bridge",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@ai-sdk/gateway": "^4.0.85",
+    "ai": "^7.0.105"
+  }
+}

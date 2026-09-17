@@ -5,6 +5,7 @@ Playwright drives a visible Chromium window and records video, and a pluggable *
 
 ```
 pip install -r requirements.txt && python -m playwright install chromium
+npm install                      # only for the jev profile
 python -m showdown --profile claude-code --games 1
 ```
 
@@ -34,3 +35,22 @@ One headless Claude Code run per decision:
 The model has no tools, gets the state as text (recent log, team, opponent, field, legal options), and replies with
 JSON: action, index, tera, a short `thought` for the overlay, and `notes`, which are fed into the next turn's prompt as memory.
 Uses your Claude Code login (no API key). Options: `--model`, `--effort`, `--timeout`.
+
+### `jev`
+[Jev](https://vercel.com/ai-gateway/models/jev) (`typesafe-ai/jev`) through Vercel AI Gateway. Jev is an evaluation model:
+it scores typed questions against a shared state and returns probabilities, with no reasoning text. Each decision is **one
+composite Choice question**. Every legal full action this turn is an option (`move1`…`move4`, `moveN_tera`, `switchN`),
+so Jev weighs attacking, Terastallizing and switching against each other in a single distribution. The harness computes
+the deterministic facts and writes them into each option's description: type effectiveness vs the opposing active Pokémon,
+what each switch-in takes from the opponent's STAB types, each switch-in's best attack, and the defensive change from Tera.
+The overlay shows the probability bars instead of a thought.
+
+Python calls a small Node bridge (`showdown/profiles/jev_bridge.mjs`) that uses the AI SDK's `experimental_evaluate`:
+
+```
+npm install                      # ai + @ai-sdk/gateway
+echo AI_GATEWAY_API_KEY=... > .env
+python -m showdown --profile jev --games 1
+```
+
+Set `NODE` if `node` isn't on PATH. No memory between turns: each call sees the current state plus the last 20 log lines.
