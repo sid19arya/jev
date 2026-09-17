@@ -109,7 +109,7 @@ STATE_JS = r"""
 """
 
 OVERLAY_JS = r"""
-({title, body, mood, bars}) => {
+({title, body, mood, bars, footer}) => {
   let el = document.getElementById('llm-overlay');
   if (!el) {
     el = document.createElement('div');
@@ -130,7 +130,8 @@ OVERLAY_JS = r"""
         <span style="display:block;height:100%;width:${(p * 100).toFixed(1)}%;background:${chosen ? '#7bd88f' : '#8a8a9e'}"></span></span>
       <span style="width:42px;text-align:right">${Math.round(p * 100)}%</span></div>`).join('');
   el.innerHTML = `<div style="font-weight:700;color:${color};margin-bottom:6px;font-size:13px;letter-spacing:.3px">
-    ${esc(title)}</div><div>${esc(body || '')}</div>${barRows}`;
+    ${esc(title)}</div><div>${esc(body || '')}</div>${barRows}
+    ${footer ? `<div style="margin-top:8px;padding-top:6px;border-top:1px solid #3a3a4a;color:#a9a9bd;font:12px ui-monospace,Consolas,monospace">${esc(footer)}</div>` : ''}`;
 }
 """
 
@@ -162,17 +163,32 @@ def describe(decision, state):
     return f"Switch to {req['team'][decision['index']]['species']}"
 
 
+async def press(page, selector):
+    """Clicks like a user; if something (a popup, a tooltip) intercepts the click, triggers the button directly."""
+    try:
+        await page.locator(selector).click(timeout=4000)
+    except Exception:
+        clicked = await page.evaluate("(sel) => { const el = document.querySelector(sel); if (el) el.click(); return !!el; }",
+                                      selector)
+        if not clicked:
+            raise
+
+
 async def click_decision(page, room_id, decision, state):
     moves, switches = legal_options(state)
     root = f"#room-{room_id} .battle-controls"
     action, idx = decision.get("action"), decision.get("index")
+    # Showdown popups (challenge dialogs, notices) sit over the page and swallow clicks.
+    await page.evaluate("() => { while (window.app && app.popups && app.popups.length) app.closePopup(); }")
     if action == "move" and idx in moves:
         if decision.get("tera") and can_tera(state):
-            await page.locator(f"{root} input[name=terastallize]").check()
-        await page.locator(f"{root} button[name=chooseMove][value='{idx}']").click()
+            tera = page.locator(f"{root} input[name=terastallize]")
+            if not await tera.is_checked():
+                await press(page, f"{root} input[name=terastallize]")
+        await press(page, f"{root} button[name=chooseMove][value='{idx}']")
         return
     if action == "switch" and idx in switches:
-        await page.locator(f"{root} button[name=chooseSwitch][value='{idx}']").click()
+        await press(page, f"{root} button[name=chooseSwitch][value='{idx}']")
         return
     raise ValueError(f"illegal decision {decision}")
 
@@ -194,19 +210,59 @@ async def login(page, name):
     await page.wait_for_function(f"app.user.get('named') && app.user.get('name') === {json.dumps(name)}", timeout=30000)
 
 
-async def play_game(page, profile, fmt, log_file):
-    async def overlay(title, body="", mood="info", bars=None):
-        await page.evaluate(OVERLAY_JS, {"title": title, "body": body, "mood": mood, "bars": bars})
+class Metrics:
+    """Per-player running totals of latency, tokens and cost."""
 
-    await page.evaluate("(fmt) => { app.send('/utm null'); app.send('/search ' + fmt); }", fmt)
-    await overlay(f"🧠 {profile.label}", f"Searching for a {fmt} opponent on the ladder...")
-    find_room = "Object.keys(app.rooms).find(id => id.startsWith('battle-') && app.rooms[id].battle && !app.rooms[id].battle.ended)"
-    await page.wait_for_function(f"!!({find_room})", timeout=600000, polling=1000)
-    room_id = await page.evaluate(find_room)
-    print(f"Battle started: https://play.pokemonshowdown.com/{room_id}", flush=True)
+    def __init__(self):
+        self.records = []
+
+    def add(self, wall_s, metrics):
+        self.records.append({"wall_latency_s": wall_s, **(metrics or {})})
+
+    def total(self, key):
+        return sum(r.get(key) or 0 for r in self.records)
+
+    def footer(self):
+        n = len(self.records)
+        if not n:
+            return ""
+        return (f"Σ {n} decisions · {self.total('input_tokens') / 1000:.1f}k tok in / {self.total('output_tokens') / 1000:.1f}k out"
+                f" · ${self.total('cost_usd'):.4f} · avg {self.total('wall_latency_s') / n:.1f}s")
+
+    def summary(self):
+        def stats(key):
+            vals = sorted(r[key] for r in self.records if r.get(key) is not None)
+            if not vals:
+                return None
+            pick = lambda q: vals[min(len(vals) - 1, int(q * len(vals)))]
+            return {"mean": round(sum(vals) / len(vals), 3), "median": round(pick(0.5), 3),
+                    "p95": round(pick(0.95), 3), "max": round(vals[-1], 3), "total": round(sum(vals), 3)}
+        return {
+            "decisions": len(self.records),
+            "fallbacks": sum(1 for r in self.records if r.get("fallback")),
+            "input_tokens": self.total("input_tokens"), "output_tokens": self.total("output_tokens"),
+            "thinking_tokens": self.total("thinking_tokens"),
+            "cache_read_tokens": self.total("cache_read_tokens"), "cache_write_tokens": self.total("cache_write_tokens"),
+            "cost_usd": round(self.total("cost_usd"), 6),
+            "cost_source": next((r["cost_source"] for r in self.records if r.get("cost_source")), None),
+            "wall_latency_s": stats("wall_latency_s"), "api_latency_s": stats("api_latency_s"),
+        }
+
+
+async def show(page, title, body="", mood="info", bars=None, footer=""):
+    await page.evaluate(OVERLAY_JS, {"title": title, "body": body, "mood": mood, "bars": bars, "footer": footer})
+
+
+FIND_ROOM = ("Object.keys(app.rooms).find(id => id.startsWith('battle-') && app.rooms[id].battle "
+             "&& !app.rooms[id].battle.ended)")
+
+
+async def battle_loop(page, room_id, profile, log_file, metrics=None, player=None):
+    """Plays one battle to the end in an already-open battle room. Returns the winner line."""
+    metrics = metrics or Metrics()
+    tag = f"[{player}] " if player else ""
     await page.evaluate("(id) => app.focusRoom(id)", room_id)
-    await overlay(f"🧠 {profile.label}", "Battle found! Sizing up the opponent...")
-
+    await show(page, f"🧠 {profile.label}", "Battle found! Sizing up the opponent...")
     profile.new_game()
     last_rqid, log_cursor = None, 0
     while True:
@@ -216,8 +272,8 @@ async def play_game(page, profile, fmt, log_file):
             return None
         if state["ended"]:
             winner_line = next((l for l in reversed(state["logLines"]) if " won the battle" in l), "Battle over")
-            await overlay(f"🏁 {profile.label}", winner_line, "decided")
-            print(winner_line, flush=True)
+            await show(page, f"🏁 {profile.label}", winner_line, "decided", footer=metrics.footer())
+            print(f"{tag}{winner_line}", flush=True)
             await page.wait_for_timeout(6000)
             return winner_line
         if not state["ready"] or not state["request"] or state["request"]["wait"] or state["rqid"] == last_rqid:
@@ -228,24 +284,38 @@ async def play_game(page, profile, fmt, log_file):
         last_rqid = state["rqid"]
         mine = state["myActive"]["species"] if state["myActive"] else "?"
         theirs = state["oppActive"]["species"] if state["oppActive"] else "?"
-        await overlay(f"🤔 {profile.label} is thinking... (turn {state['turn']})", f"{mine} vs {theirs}", "thinking")
+        await show(page, f"🤔 {profile.label} is thinking... (turn {state['turn']})", f"{mine} vs {theirs}", "thinking",
+                   footer=metrics.footer())
 
         t0 = asyncio.get_event_loop().time()
         try:
             decision = await profile.decide(state, new_log)
+            wall = asyncio.get_event_loop().time() - t0
             await click_decision(page, room_id, decision, state)
         except Exception as e:  # never stall the game: fall back to a legal click
-            print(f"  profile/click error: {e}", file=sys.stderr, flush=True)
-            decision = {**fallback_decision(state), "thought": f"(fallback — {e})"}
+            wall = asyncio.get_event_loop().time() - t0
+            print(f"{tag}  profile/click error: {e}", file=sys.stderr, flush=True)
+            decision = {**fallback_decision(state), "thought": f"(fallback — {e})", "metrics": {"fallback": True}}
             await click_decision(page, room_id, decision, state)
-        secs = asyncio.get_event_loop().time() - t0
+        metrics.add(wall, decision.get("metrics"))
         label = describe(decision, state)
         thought = decision.get("thought", "")
-        await overlay(f"💡 Turn {state['turn']}: {label}  ({secs:.1f}s)", thought, "decided", decision.get("bars"))
-        print(f"  T{state['turn']}: {label}" + (f" — {thought}" if thought else ""), flush=True)
-        log_file.write(json.dumps({"room": room_id, "turn": state["turn"], "label": label,
-                                   "decision": decision, "seconds": round(secs, 2)}) + "\n")
+        await show(page, f"💡 Turn {state['turn']}: {label}  ({wall:.1f}s)", thought, "decided", decision.get("bars"),
+                   footer=metrics.footer())
+        print(f"{tag}  T{state['turn']}: {label} ({wall:.1f}s)" + (f" — {thought}" if thought else ""), flush=True)
+        log_file.write(json.dumps({"player": player or profile.name, "room": room_id, "turn": state["turn"],
+                                   "label": label, "wall_latency_s": round(wall, 3), "decision": decision}) + "\n")
         log_file.flush()
+
+
+async def play_game(page, profile, fmt, log_file):
+    """Searches the ladder for an opponent, then plays the battle."""
+    await page.evaluate("(fmt) => { app.send('/utm null'); app.send('/search ' + fmt); }", fmt)
+    await show(page, f"🧠 {profile.label}", f"Searching for a {fmt} opponent on the ladder...")
+    await page.wait_for_function(f"!!({FIND_ROOM})", timeout=600000, polling=1000)
+    room_id = await page.evaluate(FIND_ROOM)
+    print(f"Battle started: https://play.pokemonshowdown.com/{room_id}", flush=True)
+    return await battle_loop(page, room_id, profile, log_file)
 
 
 async def run(profile, games=1, fmt="gen9randombattle", name=None, headless=False):

@@ -126,6 +126,7 @@ class JevProfile:
             raise RuntimeError("jev timed out")
         if proc.returncode:
             raise RuntimeError(f"jev bridge failed: {err.decode('utf-8', 'replace')[-400:]}")
+
         result = json.loads(out)
         answer = result["answers"]["action"]
         choice = answer["choice"]
@@ -133,10 +134,15 @@ class JevProfile:
 
         kind = "move" if choice.startswith("move") else "switch"
         index = int(choice.removeprefix(kind).removesuffix("_tera"))
+        usage = result.get("usage") or {}
         return {
             "action": kind, "index": index, "tera": choice.endswith("_tera"),
             "thought": f"{probs[0][1]:.0%} on its pick across {len(labels)} legal actions (one Choice question).",
             "bars": [[labels.get(k, k), p, k == choice] for k, p in probs[:7]],
-            "choice": choice, "probabilities": dict(probs), "usage": result.get("usage"),
-            "recovered": result.get("recovered", False),
+            "choice": choice, "probabilities": dict(probs), "adjusted": bool(result.get("adjusted")),
+            "metrics": {
+                "input_tokens": usage.get("inputTokens"), "output_tokens": usage.get("outputTokens"),
+                "cost_usd": result.get("costUsd"), "cost_source": "gateway billed",
+                "api_latency_s": (result["apiMs"] / 1000) if result.get("apiMs") is not None else None,
+            },
         }

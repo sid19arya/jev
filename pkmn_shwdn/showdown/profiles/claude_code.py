@@ -8,7 +8,7 @@ from pathlib import Path
 from ..harness import can_tera, legal_options
 
 SYSTEM_PROMPT = """You are an expert competitive Pokemon player playing a live Gen 9 Random Battle \
-on Pokemon Showdown against a real human on the ladder. Each turn you get the full visible game \
+on Pokemon Showdown against a live opponent. Each turn you get the full visible game \
 state and the legal options. Think like a strong player: type matchups, speed tiers, likely \
 random-battle sets, hazards, preserving win conditions, when to Terastallize (once per game), \
 and predicting switches.
@@ -79,5 +79,14 @@ class ClaudeCodeProfile:
             raise RuntimeError(f"no JSON in model output: {response['result'][:200]}")
         decision = json.loads(match.group(0))
         self.notes = decision.get("notes", self.notes)
-        decision["usage"] = response.get("usage", {})
+        u = response.get("usage", {})
+        cache_read, cache_write = u.get("cache_read_input_tokens", 0), u.get("cache_creation_input_tokens", 0)
+        decision["metrics"] = {
+            "input_tokens": u.get("input_tokens", 0) + cache_read + cache_write,
+            "output_tokens": u.get("output_tokens"),
+            "thinking_tokens": (u.get("output_tokens_details") or {}).get("thinking_tokens"),
+            "cache_read_tokens": cache_read, "cache_write_tokens": cache_write,
+            "cost_usd": response.get("total_cost_usd"), "cost_source": "Claude Code API-rate estimate",
+            "api_latency_s": (response["duration_api_ms"] / 1000) if response.get("duration_api_ms") else None,
+        }
         return decision

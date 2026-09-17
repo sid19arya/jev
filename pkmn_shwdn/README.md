@@ -54,3 +54,23 @@ python -m showdown --profile jev --games 1
 ```
 
 Set `NODE` if `node` isn't on PATH. No memory between turns: each call sees the current state plus the last 20 log lines.
+
+## Versus mode
+
+```
+python -m showdown --profile claude-code --vs jev
+```
+
+Two Chromium instances, each logged in as its own guest and recording its own point of view. Side 1 challenges
+side 2 directly (no ladder), and both battle loops run concurrently in one battle. Each overlay shows a running
+footer of decisions, tokens in/out, cost and average latency. When the battle ends you get:
+
+- `logs/versus-<stamp>.jsonl`: every decision from both sides, with tokens, cost and latency
+- `logs/versus-<stamp>-summary.{md,json}`: per-player totals: tokens in/out (cache and thinking breakdown), cost,
+  wall latency and model API latency (mean / median / p95)
+- `videos/versus-<stamp>-<profile>.mp4` for each side, plus `-side-by-side.mp4` (needs ffmpeg)
+
+Metric sources: Jev's cost is the amount the gateway billed (`providerMetadata.gateway.cost`), and its API latency is
+the gateway's provider timing. Claude's tokens, cost (an API-rate estimate, not what a subscription is billed) and
+API latency come from `claude -p --output-format json`. Wall latency is measured by the harness and includes
+process start-up.
