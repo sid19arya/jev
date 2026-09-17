@@ -7,3 +7,4 @@ node_modules/
 /wordle/videos/
 /wordle/runs/
 *.log
+/wordle/docs/dist/
