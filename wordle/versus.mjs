@@ -3,6 +3,7 @@
 //
 // Usage: node versus.mjs [--word crane] [--profiles knockout,letter-by-letter,parallel-letters]
 //                        [--time-limit 12] [--headless] [--no-video]
+//        node versus.mjs --rebuild runs/versus-<stamp> [--content-scale 0.851]   (remake a run's videos and summary)
 //
 // Each profile gets its own Chromium window (tiled across the top of the screen on Windows) and the terminal
 // shows a live dashboard. Output goes to runs/versus-<stamp>/: events.jsonl, summary.json, summary.md,
@@ -10,16 +11,29 @@
 // shortly after the first game finishes and then at 4× (needs ffmpeg on PATH).
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { playGame } from './engine.mjs';
 import { ROOT, WORDS } from './lib/wordle.mjs';
 import { MODEL_ID, hasGatewayKey } from './lib/jev.mjs';
 import { PROFILES, getProfile } from './profiles/index.mjs';
 import { C, BANNER, bold, dim, strike, tile, pad, SPINNER } from './lib/term.mjs';
+import { buildVideos, hasFfmpeg } from './lib/video.mjs';
 
 const args = process.argv.slice(2);
 const flag = name => args.includes(name);
 const opt = name => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
+
+// Rebuild mode: remake the MP4s and summary of an existing run from its recorded .webm files.
+if (opt('--rebuild')) {
+  const dir = path.resolve(opt('--rebuild'));
+  const summary = JSON.parse(fs.readFileSync(path.join(dir, 'summary.json'), 'utf8'));
+  if (opt('--content-scale')) summary.contentScale = Number(opt('--content-scale'));
+  Object.assign(summary, buildVideos(dir, summary.results, { contentScale: summary.contentScale ?? 1 }));
+  fs.writeFileSync(path.join(dir, 'summary.json'), JSON.stringify(summary, null, 2));
+  fs.writeFileSync(path.join(dir, 'summary.md'), summaryMarkdown(summary));
+  console.log(`Rebuilt ${path.relative(ROOT, dir)}: ${summary.sideBySide ?? 'no side-by-side'}, ${summary.sideBySideFast ?? 'no fast version'}`);
+  process.exit(0);
+}
 
 const profiles = (opt('--profiles')?.split(',') ?? PROFILES.map(p => p.name)).map(name => getProfile(name.trim()));
 const word = (opt('--word') ?? WORDS[Math.floor(Math.random() * WORDS.length)]).toLowerCase();
@@ -39,8 +53,10 @@ const eventLog = fs.createWriteStream(path.join(runDir, 'events.jsonl'));
 // ---------- window tiling ----------
 // Chromium's --force-device-scale-factor shrinks the 1100×760 page to fit a third of the screen without changing
 // its layout. Window position and size flags are then in scaled units: physical px = value × scale factor.
-function tilingArgs(count) {
-  if (headless || process.platform !== 'win32') return () => [];
+// Returns { args: i => flags for window i, scale } where scale is how much the recorded page is shrunk.
+function tiling(count) {
+  const none = { args: () => [], scale: 1 };
+  if (headless || process.platform !== 'win32') return none;
   try {
     const out = execFileSync('powershell', ['-NoProfile', '-Command',
       'Add-Type -AssemblyName System.Windows.Forms; $w=[System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea; ' +
@@ -48,12 +64,16 @@ function tilingArgs(count) {
     const [, physicalWidth] = out.trim().split(/\s+/).map(Number);
     const windowPhysical = Math.floor(physicalWidth / count);
     const dsf = Math.min(1, (windowPhysical - 24) / 1100);
-    return i => [`--force-device-scale-factor=${dsf.toFixed(3)}`,
-      `--window-position=${Math.round(i * windowPhysical / dsf)},0`,
-      `--window-size=${Math.round(windowPhysical / dsf)},${760 + 110}`];
-  } catch { return () => []; }
+    const scale = Number(dsf.toFixed(3));
+    return {
+      scale,
+      args: i => [`--force-device-scale-factor=${scale}`,
+        `--window-position=${Math.round(i * windowPhysical / scale)},0`,
+        `--window-size=${Math.round(windowPhysical / scale)},${760 + 110}`],
+    };
+  } catch { return none; }
 }
-const windowArgs = tilingArgs(profiles.length);
+const windows = tiling(profiles.length);
 
 // ---------- live state ----------
 const started = Date.now();
@@ -91,6 +111,7 @@ const RESULT = {
   won: g => C.green(bold(`✓ solved in ${g.summary.turns}`)),
   lost: () => C.red(bold('✗ out of guesses')),
   stuck: g => C.red(bold(`🧱 gave up on guess ${g.rows.length + 1}`)),
+  closed: () => C.red(bold('🪟 window closed')),
   timeout: () => C.yellow(bold('⏱ stopped: time limit')),
   error: () => C.red(bold('error')),
 };
@@ -156,7 +177,7 @@ render();
 await Promise.all(games.map(async (g, i) => {
   try {
     await playGame({ profile: g.profile.name, word, headless, video, videoDir: runDir, signal: controller.signal,
-      browserArgs: windowArgs(i), onEvent: e => onEvent(g, e) });
+      browserArgs: windows.args(i), onEvent: e => onEvent(g, e) });
   } catch (err) {
     g.error = err?.data?.error?.message ?? err?.message ?? String(err);
     g.result = 'error';
@@ -192,69 +213,20 @@ const results = games.map(g => {
   };
 });
 
-// Videos: name per profile, then an MP4 each and a labelled side-by-side.
-const ffmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
-const videos = [];
+// Videos: name each recording per profile, then build the MP4s (see lib/video.mjs).
 let sideBySide = null, sideBySideFast = null;
-const FAST_SPEED = 4;
 if (video) {
   for (const r of results) {
     if (!r.video || !fs.existsSync(r.video)) continue;
     const webm = path.join(runDir, `${r.profile}.webm`);
     fs.renameSync(r.video, webm);
     r.video = webm;
-    if (ffmpeg) {
-      const mp4 = path.join(runDir, `${r.profile}.mp4`);
-      spawnSync('ffmpeg', ['-loglevel', 'error', '-y', '-i', webm, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-        '-pix_fmt', 'yuv420p', '-movflags', '+faststart', mp4], { stdio: 'inherit' });
-      r.mp4 = mp4;
-      videos.push(r);
-    }
   }
-  if (ffmpeg && videos.length > 1) {
-    const duration = file => Number(spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], { encoding: 'utf8' }).stdout) || 0;
-    const durations = videos.map(r => duration(r.mp4));
-    const longest = Math.max(...durations);
-    const font = ['C:/Windows/Fonts/arialbd.ttf', 'C:/Windows/Fonts/arial.ttf'].find(f => fs.existsSync(f));
-    const fontArg = font ? `fontfile='${font.replace(':', '\\:')}':` : '';
-    const clean = s => s.replace(/[:'\\%,]/g, ' ');
-    const resultLabel = r => clean({
-      won: `solved in ${r.guessesUsed}`, lost: 'out of guesses', stuck: `gave up on guess ${r.guessesUsed + 1}`, timeout: 'stopped at time limit', error: 'error',
-    }[r.result] + ` · ${r.calls} calls · ${r.rejected} rejected · $${r.cost.toFixed(4)}`);
-    const filters = videos.map((r, i) => {
-      const resultAt = Math.max(0, ((r.finishedMs ?? 0) - (r.videoStartMs ?? 0)) / 1000 - 1.5);
-      return `[${i}:v]tpad=stop_mode=clone:stop_duration=${(longest - durations[i] + 0.5).toFixed(2)},crop=800:760:300:0,` +
-        `pad=800:860:0:90:color=0x121213,` +
-        `drawtext=${fontArg}text='${clean(r.title)}':expansion=none:x=(w-text_w)/2:y=14:fontsize=32:fontcolor=white,` +
-        `drawtext=${fontArg}text='${resultLabel(r)}':expansion=none:x=(w-text_w)/2:y=56:fontsize=22:fontcolor=0x6aaa64:enable='gte(t,${resultAt.toFixed(2)})'[v${i}]`;
-    });
-    const target = path.join(runDir, 'side-by-side.mp4');
-    const res = spawnSync('ffmpeg', ['-loglevel', 'error', '-y', ...videos.flatMap(r => ['-i', r.mp4]), '-filter_complex',
-      `${filters.join(';')};${videos.map((_, i) => `[v${i}]`).join('')}hstack=inputs=${videos.length},scale=1920:-2[out]`,
-      '-map', '[out]', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', target],
-    { stdio: 'inherit' });
-    if (res.status === 0) {
-      sideBySide = path.basename(target);
-      // Fast version: normal speed until ~2.5s after the first game shows its result (its end event lands about
-      // 2s after the final board, which the engine holds on screen), then 4× for the rest.
-      const firstEnd = Math.min(...videos.map(r => ((r.finishedMs ?? Infinity) - (r.videoStartMs ?? 0)) / 1000));
-      const speedFrom = firstEnd + 0.5;
-      if (Number.isFinite(speedFrom) && longest - speedFrom > 5) {
-        const fast = path.join(runDir, 'side-by-side-fast.mp4');
-        const fastRes = spawnSync('ffmpeg', ['-loglevel', 'error', '-y', '-i', target, '-filter_complex',
-          `[0:v]split=2[a][b];[a]trim=0:${speedFrom.toFixed(2)},setpts=PTS-STARTPTS[a1];` +
-          `[b]trim=start=${speedFrom.toFixed(2)},setpts=(PTS-STARTPTS)/${FAST_SPEED},fps=25,` +
-          `drawtext=${fontArg}text='${FAST_SPEED}x speed':expansion=none:x=w-text_w-24:y=h-text_h-18:fontsize=28:fontcolor=white:box=1:boxcolor=0x000000@0.6:boxborderw=10[b1];` +
-          '[a1][b1]concat=n=2:v=1:a=0[out]',
-          '-map', '[out]', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', fast],
-        { stdio: 'inherit' });
-        if (fastRes.status === 0) sideBySideFast = path.basename(fast);
-      }
-    }
-  }
+  if (hasFfmpeg()) ({ sideBySide, sideBySideFast } = buildVideos(runDir, results, { contentScale: windows.scale }));
 }
 
-const summary = { stamp, model: MODEL_ID, secret: word, timeLimitMin, elapsedMs: Date.now() - started, results, sideBySide, sideBySideFast };
+const summary = { stamp, model: MODEL_ID, secret: word, timeLimitMin, elapsedMs: Date.now() - started, contentScale: windows.scale,
+  results, sideBySide, sideBySideFast };
 fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(summary, null, 2));
 fs.writeFileSync(path.join(runDir, 'summary.md'), summaryMarkdown(summary));
 
@@ -264,7 +236,7 @@ function summaryMarkdown(s) {
   const num = v => v == null ? '–' : Number.isInteger(v) ? v.toLocaleString() : v.toFixed(1);
   const pctOf = v => v == null ? '–' : `${(v * 100).toFixed(1)}%`;
   const ms = v => v == null ? '–' : `${(v / 1000).toFixed(2)}s`;
-  const resultCell = r => ({ won: `🏆 solved in ${r.guessesUsed}/6`, lost: '❌ out of guesses', stuck: `🧱 gave up on guess ${r.guessesUsed + 1}`,
+  const resultCell = r => ({ won: `🏆 solved in ${r.guessesUsed}/6`, lost: '❌ out of guesses', stuck: `🧱 gave up on guess ${r.guessesUsed + 1}`, closed: '🪟 window closed',
     timeout: '⏱ stopped at time limit', error: `⚠️ error: ${r.error}` }[r.result] ?? r.result);
   const row = (label, f) => `| ${label} | ${rs.map(f).join(' | ')} |`;
   const emoji = { correct: '🟩', present: '🟨', absent: '⬛' };

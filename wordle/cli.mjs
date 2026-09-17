@@ -122,6 +122,7 @@ function render() {
       won: C.green(bold(`🎉 Jev solved ${e.secret.toUpperCase()} in ${e.turns}/6`)),
       lost: C.red(bold(`💀 Out of guesses · answer: ${e.secret.toUpperCase()}`)),
       stuck: C.red(bold(`🧱 Gave up on guess ${e.turns + 1}: no accepted word · answer: ${e.secret.toUpperCase()}`)),
+      closed: C.red(bold(`🪟 Game window was closed${e.secret ? ` · answer: ${e.secret.toUpperCase()}` : ''}`)),
     }[e.result]];
     const walls = s.rows.reduce((n, r) => n + r.walls, 0) + (t && !t.done ? t.rejected.length : 0);
     lines.push(`${dim('Jev calls')} ${C.white(String(e.calls))}   ${dim('input tokens')} ${C.white(e.inputTokens.toLocaleString())}   ` +

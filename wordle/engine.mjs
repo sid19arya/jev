@@ -23,7 +23,8 @@ import { getProfile } from './profiles/index.mjs';
  * @param {(e: object) => void} [o.onEvent]
  * @param {() => boolean} [o.shouldPause]  checked after each scored guess; true = wait before the next turn
  * @param {() => Promise<'next'|'auto'>} [o.waitForNext]  resolves when the user continues from outside the page (e.g. a keypress)
- * @param {AbortSignal} [o.signal]    stops the game before its next try; the result is 'timeout'
+ * @param {AbortSignal} [o.signal]    stops the game immediately, even mid-call; the result is 'timeout'
+ *                                    (closing the game's window also ends it, with result 'closed')
  * @param {string[]} [o.browserArgs]  extra Chromium flags (e.g. window position/scale when tiling windows)
  * @param {string} [o.videoDir]       where to save the recording (default: videos/)
  */
@@ -116,82 +117,106 @@ export async function playGame({ profile: profileName, word, headless = false, v
     const rejections = []; // [{ turn, attempt, word }] for the whole game: a non-word stays a non-word
     let result;
 
-    turns: for (let turn = 1; turn <= 6; turn++) {
-      const history = await readBoard();
-      const candidates = consistent(history);
-      onEvent({ type: 'turn', turn, remaining: candidates.length });
+    // Stopping: the caller's signal (time limit) or the game's window being closed ends the game immediately,
+    // even mid-call; whatever was in flight is abandoned.
+    const stop = new AbortController();
+    const stopFromCaller = () => stop.abort('timeout');
+    if (signal?.aborted) stopFromCaller(); else signal?.addEventListener('abort', stopFromCaller, { once: true });
+    page.on('close', () => stop.abort('closed'));
+    const stopped = new Promise((_, reject) => stop.signal.addEventListener('abort', () => reject(stop.signal.reason), { once: true }));
+    stopped.catch(() => {});
+    const untilStopped = work => { work.catch(() => {}); return Promise.race([work, stopped]); };
 
-      for (let attempt = 1; ; attempt++) {
-        if (signal?.aborted) { result = 'timeout'; break turns; }
-        if (attempt > maxAttempts) { result = 'stuck'; break turns; }
-        onEvent({ type: 'attempt', turn, attempt });
+    try {
+      turns: for (let turn = 1; turn <= 6; turn++) {
+        const history = await untilStopped(readBoard());
+        const candidates = consistent(history);
+        onEvent({ type: 'turn', turn, remaining: candidates.length });
 
-        let typed = '';
-        const type = async ch => {
-          await page.keyboard.press(ch, { delay: 50 });
-          typed += ch;
-          onEvent({ type: 'typed', turn, attempt, letters: typed });
-        };
-        const ctx = {
-          turn, attempt, maxAttempts, history, candidates, config: profile.config,
-          rejections: rejections.map(r => ({ ...r })), rejected: rejections.map(r => r.word),
-          ask: async (state, questions) => {
-            const answers = await jev.ask(state, questions);
-            onEvent({ type: 'usage', turn, attempt, ...jev.totals, cost: jev.cost() });
-            return answers;
-          },
-          type,
-          wait: ms => page.waitForTimeout(ms),
-          show: async (sections, status = '') => {
-            const snapshot = structuredClone(sections);
-            onEvent({ type: 'view', turn, attempt, status, sections: snapshot });
-            await renderPanel(status, snapshot);
-          },
-        };
+        for (let attempt = 1; ; attempt++) {
+          if (attempt > maxAttempts) { result = 'stuck'; break turns; }
+          onEvent({ type: 'attempt', turn, attempt });
 
-        const choice = await profile.guess(ctx);
-        if (!choice?.word) { result = 'stuck'; break turns; }
-        const guess = choice.word.toLowerCase();
+          let typed = '';
+          const type = async ch => {
+            await page.keyboard.press(ch, { delay: 50 });
+            typed += ch;
+            onEvent({ type: 'typed', turn, attempt, letters: typed });
+          };
+          const ctx = {
+            turn, attempt, maxAttempts, history, candidates, config: profile.config,
+            rejections: rejections.map(r => ({ ...r })), rejected: rejections.map(r => r.word),
+            ask: async (state, questions) => {
+              const answers = await jev.ask(state, questions, { signal: stop.signal });
+              onEvent({ type: 'usage', turn, attempt, ...jev.totals, cost: jev.cost() });
+              return answers;
+            },
+            type,
+            wait: ms => page.waitForTimeout(ms),
+            show: async (sections, status = '') => {
+              const snapshot = structuredClone(sections);
+              onEvent({ type: 'view', turn, attempt, status, sections: snapshot });
+              await renderPanel(status, snapshot);
+            },
+          };
 
-        // Profiles may type as they go (letter by letter) or return a whole word for the engine to type.
-        if (typed !== guess) {
-          for (let i = 0; i < typed.length; i++) await page.keyboard.press('Backspace');
-          typed = '';
-          for (const ch of guess) { await type(ch); await page.waitForTimeout(120); }
+          const choice = await untilStopped(profile.guess(ctx));
+          if (!choice?.word) { result = 'stuck'; break turns; }
+          const guess = choice.word.toLowerCase();
+
+          const submitted = await untilStopped((async () => {
+            // Profiles may type as they go (letter by letter) or return a whole word for the engine to type.
+            if (typed !== guess) {
+              for (let i = 0; i < typed.length; i++) await page.keyboard.press('Backspace');
+              typed = '';
+              for (const ch of guess) { await type(ch); await page.waitForTimeout(120); }
+            }
+            await page.evaluate(() => delete document.body.dataset.submit);
+            await page.keyboard.press('Enter');
+            await page.waitForFunction(() => document.body.dataset.submit);
+            return page.evaluate(() => document.body.dataset.submit);
+          })());
+
+          if (submitted === 'invalid') {
+            // The wall: the game rejected the word. Clear the row and let the profile try again.
+            rejections.push({ turn, attempt, word: guess });
+            onEvent({ type: 'rejected', turn, attempt, guess });
+            await untilStopped((async () => {
+              await page.waitForTimeout(700);
+              for (let i = 0; i < 5; i++) await page.keyboard.press('Backspace', { delay: 40 });
+            })());
+            continue;
+          }
+
+          const after = await untilStopped((async () => {
+            await page.waitForFunction(() => document.body.dataset.busy === 'false');
+            return readBoard();
+          })());
+          onEvent({ type: 'feedback', turn, attempt, guess, note: choice.note, states: after[after.length - 1].map(t => t.state),
+            before: candidates.length, remaining: consistent(after).length });
+          result = await untilStopped(page.evaluate(() => document.body.dataset.result));
+          if (result) break turns;
+          if (shouldPause()) await untilStopped(pause(turn));
+          break;
         }
-
-        await page.evaluate(() => delete document.body.dataset.submit);
-        await page.keyboard.press('Enter');
-        await page.waitForFunction(() => document.body.dataset.submit);
-
-        if (await page.evaluate(() => document.body.dataset.submit) === 'invalid') {
-          // The wall: the game rejected the word. Clear the row and let the profile try again.
-          rejections.push({ turn, attempt, word: guess });
-          onEvent({ type: 'rejected', turn, attempt, guess });
-          await page.waitForTimeout(700);
-          for (let i = 0; i < 5; i++) await page.keyboard.press('Backspace', { delay: 40 });
-          continue;
-        }
-
-        await page.waitForFunction(() => document.body.dataset.busy === 'false');
-        const after = await readBoard();
-        onEvent({ type: 'feedback', turn, attempt, guess, note: choice.note, states: after[after.length - 1].map(t => t.state),
-          before: candidates.length, remaining: consistent(after).length });
-        result = await page.evaluate(() => document.body.dataset.result);
-        if (result) break turns;
-        if (shouldPause()) await pause(turn);
-        break;
       }
+    } catch (err) {
+      if (!stop.signal.aborted) throw err;
+      result = stop.signal.reason; // 'timeout' or 'closed'
     }
+    signal?.removeEventListener('abort', stopFromCaller);
 
-    const turns = (await readBoard()).length;
-    const secret = await page.evaluate(() => window.__wordleSecret);
-    await renderPanel({ won: 'Solved! 🎉', lost: 'Out of guesses', stuck: `Gave up: no accepted word after ${maxAttempts} tries`,
-      timeout: 'Stopped: time limit' }[result]);
-    await page.waitForTimeout(2000);
+    const closed = page.isClosed();
+    const turns = closed ? undefined : (await readBoard()).length;
+    const secret = closed ? word : await page.evaluate(() => window.__wordleSecret);
+    if (!closed) {
+      await renderPanel({ won: 'Solved! 🎉', lost: 'Out of guesses', stuck: `Gave up: no accepted word after ${maxAttempts} tries`,
+        timeout: 'Stopped: time limit' }[result]);
+      await page.waitForTimeout(2000);
+    }
     const vid = page.video();
     await context.close();
-    const videoPath = vid ? await vid.path() : undefined;
+    const videoPath = vid ? await vid.path().catch(() => undefined) : undefined;
     const summary = { result, secret, turns, profile: profile.name, model: MODEL_ID, ...jev.totals, cost: jev.cost(), video: videoPath };
     onEvent({ type: 'end', ...summary });
     return summary;

@@ -96,7 +96,11 @@ The numbers above come from small samples (3–20 games per profile), so treat t
 
 `npm run versus` plays every profile on the same secret word at once. Options: `--word crane`,
 `--time-limit 12` (minutes; games still running are stopped and marked `timeout`), `--profiles a,b`,
-`--headless`, `--no-video`.
+`--headless`, `--no-video`. `node versus.mjs --rebuild runs/versus-<stamp>` remakes a run's videos and summary from
+its recordings.
+
+A stuck game can't hold up the run: each Jev call times out after 30s (retried twice), the time limit stops games
+immediately, and closing a game's window ends just that game (result `closed`).
 
 On Windows the three Chromium windows are tiled across the top of the screen, and the terminal shows a live
 column per profile. Each run is saved to `runs/versus-<stamp>/`:
