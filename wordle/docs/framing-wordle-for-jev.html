@@ -1,0 +1,767 @@
+<title>Framing Wordle for Jev</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap">
+<style>
+  :root {
+    --paper: #FAFAF8;
+    --ink: #1C1E23;
+    --muted: #5D626C;
+    --faint: #9A9EA7;
+    --rule: #CDD0D6;
+    --rule-strong: #1C1E23;
+    --surface: #FFFFFF;
+    --jev: #3346A6;
+    --jev-tint: #EEF0F9;
+    --jev-soft: #B9C1E6;
+    --on-jev: #FFFFFF;
+
+    --serif: "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif;
+    --sans: "IBM Plex Sans", "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #121317;
+      --ink: #E4E5E9;
+      --muted: #9BA0AA;
+      --faint: #6B707A;
+      --rule: #34373F;
+      --rule-strong: #C9CBD1;
+      --surface: #191B20;
+      --jev: #93A3F2;
+      --jev-tint: #1A1E36;
+      --jev-soft: #3C4680;
+      --on-jev: #121317;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #121317;
+    --ink: #E4E5E9;
+    --muted: #9BA0AA;
+    --faint: #6B707A;
+    --rule: #34373F;
+    --rule-strong: #C9CBD1;
+    --surface: #191B20;
+    --jev: #93A3F2;
+    --jev-tint: #1A1E36;
+    --jev-soft: #3C4680;
+    --on-jev: #121317;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.6;
+    padding-inline: 20px;
+    padding-block: 56px 72px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1100px; margin: 0 auto; }
+  .col { max-width: 68ch; margin-inline: auto; }
+
+  .kicker {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-size: clamp(30px, 4.4vw, 44px);
+    line-height: 1.12;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+    text-wrap: balance;
+    margin: 0 0 16px;
+  }
+  .byline {
+    font-family: var(--sans);
+    font-size: 14px;
+    color: var(--muted);
+    margin: 0 0 32px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+  }
+  .byline code { font-family: var(--mono); font-size: 13px; color: var(--ink); }
+  .abstract {
+    border-top: 1px solid var(--rule-strong);
+    border-bottom: 1px solid var(--rule);
+    padding-block: 18px 20px;
+  }
+  .abstract h2 {
+    font-family: var(--sans);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+  .abstract p { margin: 0 0 12px; font-size: 16px; }
+  .abstract p:last-child { margin-bottom: 0; }
+  .abstract ol { margin: 0 0 12px; padding-left: 22px; display: grid; gap: 8px; font-size: 16px; }
+  .abstract li::marker { font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--muted); }
+  .abstract li strong { font-weight: 600; }
+
+  h2.section { font-size: 22px; font-weight: 600; margin: 52px 0 12px; text-wrap: balance; }
+  h2.section .num { font-family: var(--sans); font-weight: 500; color: var(--muted); margin-right: 10px; font-size: 18px; }
+  p { margin: 0 0 16px; }
+  .mono { font-family: var(--mono); font-size: 0.86em; }
+  sup a { color: var(--jev); text-decoration: none; font-family: var(--sans); font-size: 11px; padding-left: 1px; }
+  a { color: var(--jev); }
+  a:focus-visible { outline: 2px solid var(--jev); outline-offset: 2px; }
+
+  /* ---------- figure ---------- */
+  figure { margin: 44px 0 0; }
+  .figure-scroll { overflow-x: auto; padding-bottom: 4px; }
+  .figure-scroll svg { display: block; width: 100%; min-width: 900px; height: auto; color: var(--ink); }
+  figcaption { font-size: 15px; line-height: 1.55; max-width: 68ch; margin: 20px auto 0; }
+  figcaption b { font-family: var(--sans); font-weight: 600; font-size: 13px; letter-spacing: 0.02em; margin-right: 4px; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 24px;
+    font-family: var(--sans);
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-top: 14px;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .sw-pick { width: 12px; height: 14px; background: var(--jev); display: inline-block; }
+  .sw-opt { width: 12px; height: 14px; background: var(--surface); border: 1px solid var(--jev-soft); display: inline-block; }
+  .sw-pass { width: 26px; height: 0; border-top: 1.5px solid var(--jev); display: inline-block; position: relative; }
+  .sw-pass::after { content: ""; position: absolute; right: -1px; top: -5px; border: 4px solid transparent; border-left: 6px solid var(--jev); }
+  .sw-chan { width: 26px; height: 0; border-top: 1.5px dotted var(--muted); display: inline-block; }
+
+  /* SVG, styled through the page tokens */
+  .col-head { font-family: var(--sans); font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; fill: var(--muted); }
+  .hair { stroke: var(--rule); stroke-width: 1; }
+  .hair-strong { stroke: var(--rule-strong); stroke-width: 1.2; }
+  .row-letter { font-family: var(--sans); font-size: 13px; font-weight: 600; fill: var(--muted); }
+  .row-title { font-family: var(--serif); font-size: 21px; font-weight: 600; fill: var(--ink); }
+  .row-mono { font-family: var(--mono); font-size: 11.5px; fill: var(--muted); }
+  .stat { font-family: var(--sans); font-size: 15px; font-weight: 600; fill: var(--jev); }
+  .stat-sub { font-family: var(--sans); font-size: 13px; fill: var(--ink); }
+  .stat-note { font-family: var(--serif); font-size: 13px; font-style: italic; fill: var(--muted); }
+  .frame { fill: var(--jev-tint); stroke: var(--jev); stroke-width: 1.4; }
+  .eyebrow { font-family: var(--sans); font-size: 9.5px; font-weight: 600; letter-spacing: 0.13em; fill: var(--jev); }
+  .note { font-family: var(--serif); font-size: 12.5px; font-style: italic; fill: var(--muted); }
+  .mono-note { font-family: var(--mono); font-size: 10.5px; fill: var(--muted); }
+  .cell { fill: var(--surface); stroke: var(--jev-soft); stroke-width: 0.8; }
+  .cell-l { font-family: var(--mono); font-size: 7.5px; fill: var(--muted); }
+  .pick { fill: var(--jev); stroke: var(--jev); stroke-width: 0.8; }
+  .pick-l { font-family: var(--mono); font-size: 7.5px; font-weight: 600; fill: var(--on-jev); }
+  .dot { fill: var(--jev); opacity: 0.32; }
+  .group { fill: url(#words); stroke: var(--jev-soft); stroke-width: 1; }
+  .pass { stroke: var(--jev); stroke-width: 1.4; fill: none; }
+  .flow { stroke: var(--ink); stroke-width: 1.3; fill: none; }
+  .fork { stroke: var(--jev); stroke-width: 1.2; fill: none; }
+  .chan { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 1.5 3.5; }
+  .axis { stroke: var(--faint); stroke-width: 1; fill: none; }
+  .axis-l { font-family: var(--sans); font-size: 10px; letter-spacing: 0.08em; fill: var(--faint); }
+  .head-ink { fill: var(--ink); }
+  .head-jev { fill: var(--jev); }
+  .head-faint { fill: var(--faint); }
+  .out { fill: var(--surface); stroke: var(--ink); stroke-width: 1.3; }
+  .out-l { font-family: var(--mono); font-size: 15px; font-weight: 600; fill: var(--ink); }
+  .out-sm { fill: var(--surface); stroke: var(--ink); stroke-width: 1; }
+  .out-sm-empty { fill: none; stroke: var(--faint); stroke-width: 1; stroke-dasharray: 2 2; }
+  .out-sm-l { font-family: var(--mono); font-size: 10px; font-weight: 600; fill: var(--ink); }
+  .req { fill: var(--jev); }
+  .leader { stroke: var(--faint); stroke-width: 1; stroke-dasharray: 2 3; fill: none; }
+
+  /* ---------- prose ---------- */
+  .approach { margin-bottom: 20px; }
+  .approach h3 { font-size: 17px; font-weight: 600; margin: 0 0 4px; }
+  .approach h3 .mono { font-weight: 400; color: var(--muted); margin-left: 8px; }
+  .approach p { margin: 0; }
+  .notes { margin-top: 56px; border-top: 1px solid var(--rule); padding-top: 16px; font-size: 14px; color: var(--muted); }
+  .notes ol { padding-left: 20px; margin: 0; display: grid; gap: 6px; }
+  .notes a { color: var(--muted); }
+
+  @media (max-width: 700px) {
+    body { font-size: 16px; padding-block: 36px 56px; }
+  }
+</style>
+
+<main class="page">
+  <header class="col">
+    <p class="kicker">Technical note · Structured decision models</p>
+    <h1>Three ways to ask a decision model to play Wordle</h1>
+    <p class="byline">
+      <span>Model <code>typesafe-ai/jev</code> via Vercel AI Gateway</span>
+      <span>Harness: Playwright + Chromium</span>
+      <span>September 2026</span>
+    </p>
+    <section class="abstract" aria-labelledby="abstract-h">
+      <h2 id="abstract-h">Abstract</h2>
+      <p>
+        Getting Jev to play Wordle is a good case study in what a decision model can and can't do. Jev does not write
+        text; it answers typed <em>choice</em> questions with a probability for every option. So a guess has to be framed
+        as choices, and there are three ways to do it:
+      </p>
+      <ol>
+        <li>
+          <strong>One letter at a time</strong> struggles. Each question sees the letters typed so far but not the word the
+          earlier questions were aiming for, so it plays greedily: a yellow H gets pushed into every open square
+          (<span class="mono">BOHIH</span>, <span class="mono">BOHIH</span>, …) instead of the word being re-planned.
+        </li>
+        <li>
+          <strong>Five separate channels</strong>, all letters at once, is degenerate. Each square is its own question and
+          cannot see the others, so every square picks its most common letter: <span class="mono">SEEEE</span>.
+        </li>
+        <li>
+          <strong>Whole word</strong> works, once the size is handled. A choice question takes at most 255 options, so the
+          <em>n</em> possible words are split into <em>m</em> groups with <em>m</em> × 255 ≥ <em>n</em>, all <em>m</em> are
+          asked in one call, and a final round picks among the group winners. It is fast and effective.
+        </li>
+      </ol>
+      <p>
+        The catch: code must first remove the words that contradict the clues. Left to do that itself, Jev drifts to
+        look-alike words that break the rules. Exact rules belong in code; the judgment call belongs to the model.
+      </p>
+    </section>
+  </header>
+
+  <figure aria-labelledby="fig1-cap">
+    <div class="figure-scroll">
+      <svg viewBox="0 0 1060 760" role="img" aria-label="Three rows compare how Jev picks a guess. Row a: five choices of 26 letters made one after another, each passing its letter to the next, so the word grows one letter at a time. Row b: five choices of 26 letters made at the same moment in one request, each on its own channel, merged into the word at once. Row c: one word chosen from 2,315 in two rounds, best word per group of up to 255 and then a final among the winners, producing all five letters at once.">
+        <defs>
+          <pattern id="words" width="4" height="4" patternUnits="userSpaceOnUse">
+            <rect class="dot" x="0.5" y="0.5" width="2.6" height="2.6"/>
+          </pattern>
+          <marker id="h-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-ink"/></marker>
+          <marker id="h-jev" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-jev"/></marker>
+          <marker id="h-faint" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-faint"/></marker>
+        </defs>
+
+        <!-- column heads -->
+        <text class="col-head" x="0" y="20">HOW JEV IS ASKED</text>
+        <text class="col-head" x="262" y="20">WHAT JEV CHOOSES FROM</text>
+        <text class="col-head" x="872" y="20">GUESS PRODUCED</text>
+        <line class="hair-strong" x1="0" y1="32" x2="1060" y2="32"/>
+
+        <!-- ===================== (a) one letter at a time ===================== -->
+        <g transform="translate(0 -226)">
+          <text class="row-letter" x="0" y="288">(a)</text>
+          <text class="row-title" x="0" y="314">One letter at a time</text>
+          <text class="row-mono" x="0" y="333">letter-by-letter</text>
+          <text class="stat" x="0" y="368">5 choices</text>
+          <text class="stat-sub" x="0" y="388">× 26 options each (letters)</text>
+          <text class="stat-note" x="0" y="410">one after another · 5 requests</text>
+
+          <rect class="frame" x="262" y="270" width="566" height="220" rx="6"/>
+          <text class="eyebrow" x="278" y="289">FIVE QUESTIONS IN SEQUENCE: EACH WAITS FOR THE LETTER BEFORE IT</text>
+
+          <!-- five letter questions in order; each strip starts 50px later and passes its pick down -->
+          <text class="mono-note" x="310" y="316" text-anchor="end">q1</text>
+          <g>
+            <rect class="pick" x="318.0" y="304" width="10.4" height="16"/><text class="pick-l" x="323.2" y="315" text-anchor="middle">A</text>
+            <rect class="cell" x="328.4" y="304" width="10.4" height="16"/><text class="cell-l" x="333.6" y="315" text-anchor="middle">B</text>
+            <rect class="cell" x="338.8" y="304" width="10.4" height="16"/><text class="cell-l" x="344.0" y="315" text-anchor="middle">C</text>
+            <rect class="cell" x="349.2" y="304" width="10.4" height="16"/><text class="cell-l" x="354.4" y="315" text-anchor="middle">D</text>
+            <rect class="cell" x="359.6" y="304" width="10.4" height="16"/><text class="cell-l" x="364.8" y="315" text-anchor="middle">E</text>
+            <rect class="cell" x="370.0" y="304" width="10.4" height="16"/><text class="cell-l" x="375.2" y="315" text-anchor="middle">F</text>
+            <rect class="cell" x="380.4" y="304" width="10.4" height="16"/><text class="cell-l" x="385.6" y="315" text-anchor="middle">G</text>
+            <rect class="cell" x="390.8" y="304" width="10.4" height="16"/><text class="cell-l" x="396.0" y="315" text-anchor="middle">H</text>
+            <rect class="cell" x="401.2" y="304" width="10.4" height="16"/><text class="cell-l" x="406.4" y="315" text-anchor="middle">I</text>
+            <rect class="cell" x="411.6" y="304" width="10.4" height="16"/><text class="cell-l" x="416.8" y="315" text-anchor="middle">J</text>
+            <rect class="cell" x="422.0" y="304" width="10.4" height="16"/><text class="cell-l" x="427.2" y="315" text-anchor="middle">K</text>
+            <rect class="cell" x="432.4" y="304" width="10.4" height="16"/><text class="cell-l" x="437.6" y="315" text-anchor="middle">L</text>
+            <rect class="cell" x="442.8" y="304" width="10.4" height="16"/><text class="cell-l" x="448.0" y="315" text-anchor="middle">M</text>
+            <rect class="cell" x="453.2" y="304" width="10.4" height="16"/><text class="cell-l" x="458.4" y="315" text-anchor="middle">N</text>
+            <rect class="cell" x="463.6" y="304" width="10.4" height="16"/><text class="cell-l" x="468.8" y="315" text-anchor="middle">O</text>
+            <rect class="cell" x="474.0" y="304" width="10.4" height="16"/><text class="cell-l" x="479.2" y="315" text-anchor="middle">P</text>
+            <rect class="cell" x="484.4" y="304" width="10.4" height="16"/><text class="cell-l" x="489.6" y="315" text-anchor="middle">Q</text>
+            <rect class="cell" x="494.8" y="304" width="10.4" height="16"/><text class="cell-l" x="500.0" y="315" text-anchor="middle">R</text>
+            <rect class="cell" x="505.2" y="304" width="10.4" height="16"/><text class="cell-l" x="510.4" y="315" text-anchor="middle">S</text>
+            <rect class="cell" x="515.6" y="304" width="10.4" height="16"/><text class="cell-l" x="520.8" y="315" text-anchor="middle">T</text>
+            <rect class="cell" x="526.0" y="304" width="10.4" height="16"/><text class="cell-l" x="531.2" y="315" text-anchor="middle">U</text>
+            <rect class="cell" x="536.4" y="304" width="10.4" height="16"/><text class="cell-l" x="541.6" y="315" text-anchor="middle">V</text>
+            <rect class="cell" x="546.8" y="304" width="10.4" height="16"/><text class="cell-l" x="552.0" y="315" text-anchor="middle">W</text>
+            <rect class="cell" x="557.2" y="304" width="10.4" height="16"/><text class="cell-l" x="562.4" y="315" text-anchor="middle">X</text>
+            <rect class="cell" x="567.6" y="304" width="10.4" height="16"/><text class="cell-l" x="572.8" y="315" text-anchor="middle">Y</text>
+            <rect class="cell" x="578.0" y="304" width="10.4" height="16"/><text class="cell-l" x="583.2" y="315" text-anchor="middle">Z</text>
+          </g>
+          <path class="pass" d="M323.2 320 V329 H373.2 V337" marker-end="url(#h-jev)"/>
+          <path class="leader" d="M592.4 312 H864"/>
+          <text class="mono-note" x="360" y="350" text-anchor="end">q2</text>
+          <g>
+            <rect class="cell" x="368.0" y="338" width="10.4" height="16"/><text class="cell-l" x="373.2" y="349" text-anchor="middle">A</text>
+            <rect class="cell" x="378.4" y="338" width="10.4" height="16"/><text class="cell-l" x="383.6" y="349" text-anchor="middle">B</text>
+            <rect class="cell" x="388.8" y="338" width="10.4" height="16"/><text class="cell-l" x="394.0" y="349" text-anchor="middle">C</text>
+            <rect class="cell" x="399.2" y="338" width="10.4" height="16"/><text class="cell-l" x="404.4" y="349" text-anchor="middle">D</text>
+            <rect class="pick" x="409.6" y="338" width="10.4" height="16"/><text class="pick-l" x="414.8" y="349" text-anchor="middle">E</text>
+            <rect class="cell" x="420.0" y="338" width="10.4" height="16"/><text class="cell-l" x="425.2" y="349" text-anchor="middle">F</text>
+            <rect class="cell" x="430.4" y="338" width="10.4" height="16"/><text class="cell-l" x="435.6" y="349" text-anchor="middle">G</text>
+            <rect class="cell" x="440.8" y="338" width="10.4" height="16"/><text class="cell-l" x="446.0" y="349" text-anchor="middle">H</text>
+            <rect class="cell" x="451.2" y="338" width="10.4" height="16"/><text class="cell-l" x="456.4" y="349" text-anchor="middle">I</text>
+            <rect class="cell" x="461.6" y="338" width="10.4" height="16"/><text class="cell-l" x="466.8" y="349" text-anchor="middle">J</text>
+            <rect class="cell" x="472.0" y="338" width="10.4" height="16"/><text class="cell-l" x="477.2" y="349" text-anchor="middle">K</text>
+            <rect class="cell" x="482.4" y="338" width="10.4" height="16"/><text class="cell-l" x="487.6" y="349" text-anchor="middle">L</text>
+            <rect class="cell" x="492.8" y="338" width="10.4" height="16"/><text class="cell-l" x="498.0" y="349" text-anchor="middle">M</text>
+            <rect class="cell" x="503.2" y="338" width="10.4" height="16"/><text class="cell-l" x="508.4" y="349" text-anchor="middle">N</text>
+            <rect class="cell" x="513.6" y="338" width="10.4" height="16"/><text class="cell-l" x="518.8" y="349" text-anchor="middle">O</text>
+            <rect class="cell" x="524.0" y="338" width="10.4" height="16"/><text class="cell-l" x="529.2" y="349" text-anchor="middle">P</text>
+            <rect class="cell" x="534.4" y="338" width="10.4" height="16"/><text class="cell-l" x="539.6" y="349" text-anchor="middle">Q</text>
+            <rect class="cell" x="544.8" y="338" width="10.4" height="16"/><text class="cell-l" x="550.0" y="349" text-anchor="middle">R</text>
+            <rect class="cell" x="555.2" y="338" width="10.4" height="16"/><text class="cell-l" x="560.4" y="349" text-anchor="middle">S</text>
+            <rect class="cell" x="565.6" y="338" width="10.4" height="16"/><text class="cell-l" x="570.8" y="349" text-anchor="middle">T</text>
+            <rect class="cell" x="576.0" y="338" width="10.4" height="16"/><text class="cell-l" x="581.2" y="349" text-anchor="middle">U</text>
+            <rect class="cell" x="586.4" y="338" width="10.4" height="16"/><text class="cell-l" x="591.6" y="349" text-anchor="middle">V</text>
+            <rect class="cell" x="596.8" y="338" width="10.4" height="16"/><text class="cell-l" x="602.0" y="349" text-anchor="middle">W</text>
+            <rect class="cell" x="607.2" y="338" width="10.4" height="16"/><text class="cell-l" x="612.4" y="349" text-anchor="middle">X</text>
+            <rect class="cell" x="617.6" y="338" width="10.4" height="16"/><text class="cell-l" x="622.8" y="349" text-anchor="middle">Y</text>
+            <rect class="cell" x="628.0" y="338" width="10.4" height="16"/><text class="cell-l" x="633.2" y="349" text-anchor="middle">Z</text>
+          </g>
+          <path class="pass" d="M414.8 354 V363 H423.2 V371" marker-end="url(#h-jev)"/>
+          <path class="leader" d="M642.4 346 H864"/>
+          <text class="mono-note" x="410" y="384" text-anchor="end">q3</text>
+          <g>
+            <rect class="cell" x="418.0" y="372" width="10.4" height="16"/><text class="cell-l" x="423.2" y="383" text-anchor="middle">A</text>
+            <rect class="cell" x="428.4" y="372" width="10.4" height="16"/><text class="cell-l" x="433.6" y="383" text-anchor="middle">B</text>
+            <rect class="cell" x="438.8" y="372" width="10.4" height="16"/><text class="cell-l" x="444.0" y="383" text-anchor="middle">C</text>
+            <rect class="cell" x="449.2" y="372" width="10.4" height="16"/><text class="cell-l" x="454.4" y="383" text-anchor="middle">D</text>
+            <rect class="cell" x="459.6" y="372" width="10.4" height="16"/><text class="cell-l" x="464.8" y="383" text-anchor="middle">E</text>
+            <rect class="cell" x="470.0" y="372" width="10.4" height="16"/><text class="cell-l" x="475.2" y="383" text-anchor="middle">F</text>
+            <rect class="cell" x="480.4" y="372" width="10.4" height="16"/><text class="cell-l" x="485.6" y="383" text-anchor="middle">G</text>
+            <rect class="cell" x="490.8" y="372" width="10.4" height="16"/><text class="cell-l" x="496.0" y="383" text-anchor="middle">H</text>
+            <rect class="cell" x="501.2" y="372" width="10.4" height="16"/><text class="cell-l" x="506.4" y="383" text-anchor="middle">I</text>
+            <rect class="cell" x="511.6" y="372" width="10.4" height="16"/><text class="cell-l" x="516.8" y="383" text-anchor="middle">J</text>
+            <rect class="cell" x="522.0" y="372" width="10.4" height="16"/><text class="cell-l" x="527.2" y="383" text-anchor="middle">K</text>
+            <rect class="cell" x="532.4" y="372" width="10.4" height="16"/><text class="cell-l" x="537.6" y="383" text-anchor="middle">L</text>
+            <rect class="cell" x="542.8" y="372" width="10.4" height="16"/><text class="cell-l" x="548.0" y="383" text-anchor="middle">M</text>
+            <rect class="cell" x="553.2" y="372" width="10.4" height="16"/><text class="cell-l" x="558.4" y="383" text-anchor="middle">N</text>
+            <rect class="cell" x="563.6" y="372" width="10.4" height="16"/><text class="cell-l" x="568.8" y="383" text-anchor="middle">O</text>
+            <rect class="cell" x="574.0" y="372" width="10.4" height="16"/><text class="cell-l" x="579.2" y="383" text-anchor="middle">P</text>
+            <rect class="cell" x="584.4" y="372" width="10.4" height="16"/><text class="cell-l" x="589.6" y="383" text-anchor="middle">Q</text>
+            <rect class="pick" x="594.8" y="372" width="10.4" height="16"/><text class="pick-l" x="600.0" y="383" text-anchor="middle">R</text>
+            <rect class="cell" x="605.2" y="372" width="10.4" height="16"/><text class="cell-l" x="610.4" y="383" text-anchor="middle">S</text>
+            <rect class="cell" x="615.6" y="372" width="10.4" height="16"/><text class="cell-l" x="620.8" y="383" text-anchor="middle">T</text>
+            <rect class="cell" x="626.0" y="372" width="10.4" height="16"/><text class="cell-l" x="631.2" y="383" text-anchor="middle">U</text>
+            <rect class="cell" x="636.4" y="372" width="10.4" height="16"/><text class="cell-l" x="641.6" y="383" text-anchor="middle">V</text>
+            <rect class="cell" x="646.8" y="372" width="10.4" height="16"/><text class="cell-l" x="652.0" y="383" text-anchor="middle">W</text>
+            <rect class="cell" x="657.2" y="372" width="10.4" height="16"/><text class="cell-l" x="662.4" y="383" text-anchor="middle">X</text>
+            <rect class="cell" x="667.6" y="372" width="10.4" height="16"/><text class="cell-l" x="672.8" y="383" text-anchor="middle">Y</text>
+            <rect class="cell" x="678.0" y="372" width="10.4" height="16"/><text class="cell-l" x="683.2" y="383" text-anchor="middle">Z</text>
+          </g>
+          <path class="pass" d="M600.0 388 V397 H473.2 V405" marker-end="url(#h-jev)"/>
+          <path class="leader" d="M692.4 380 H864"/>
+          <text class="mono-note" x="460" y="418" text-anchor="end">q4</text>
+          <g>
+            <rect class="cell" x="468.0" y="406" width="10.4" height="16"/><text class="cell-l" x="473.2" y="417" text-anchor="middle">A</text>
+            <rect class="cell" x="478.4" y="406" width="10.4" height="16"/><text class="cell-l" x="483.6" y="417" text-anchor="middle">B</text>
+            <rect class="cell" x="488.8" y="406" width="10.4" height="16"/><text class="cell-l" x="494.0" y="417" text-anchor="middle">C</text>
+            <rect class="cell" x="499.2" y="406" width="10.4" height="16"/><text class="cell-l" x="504.4" y="417" text-anchor="middle">D</text>
+            <rect class="cell" x="509.6" y="406" width="10.4" height="16"/><text class="cell-l" x="514.8" y="417" text-anchor="middle">E</text>
+            <rect class="cell" x="520.0" y="406" width="10.4" height="16"/><text class="cell-l" x="525.2" y="417" text-anchor="middle">F</text>
+            <rect class="cell" x="530.4" y="406" width="10.4" height="16"/><text class="cell-l" x="535.6" y="417" text-anchor="middle">G</text>
+            <rect class="cell" x="540.8" y="406" width="10.4" height="16"/><text class="cell-l" x="546.0" y="417" text-anchor="middle">H</text>
+            <rect class="cell" x="551.2" y="406" width="10.4" height="16"/><text class="cell-l" x="556.4" y="417" text-anchor="middle">I</text>
+            <rect class="cell" x="561.6" y="406" width="10.4" height="16"/><text class="cell-l" x="566.8" y="417" text-anchor="middle">J</text>
+            <rect class="cell" x="572.0" y="406" width="10.4" height="16"/><text class="cell-l" x="577.2" y="417" text-anchor="middle">K</text>
+            <rect class="cell" x="582.4" y="406" width="10.4" height="16"/><text class="cell-l" x="587.6" y="417" text-anchor="middle">L</text>
+            <rect class="cell" x="592.8" y="406" width="10.4" height="16"/><text class="cell-l" x="598.0" y="417" text-anchor="middle">M</text>
+            <rect class="cell" x="603.2" y="406" width="10.4" height="16"/><text class="cell-l" x="608.4" y="417" text-anchor="middle">N</text>
+            <rect class="cell" x="613.6" y="406" width="10.4" height="16"/><text class="cell-l" x="618.8" y="417" text-anchor="middle">O</text>
+            <rect class="cell" x="624.0" y="406" width="10.4" height="16"/><text class="cell-l" x="629.2" y="417" text-anchor="middle">P</text>
+            <rect class="cell" x="634.4" y="406" width="10.4" height="16"/><text class="cell-l" x="639.6" y="417" text-anchor="middle">Q</text>
+            <rect class="cell" x="644.8" y="406" width="10.4" height="16"/><text class="cell-l" x="650.0" y="417" text-anchor="middle">R</text>
+            <rect class="cell" x="655.2" y="406" width="10.4" height="16"/><text class="cell-l" x="660.4" y="417" text-anchor="middle">S</text>
+            <rect class="pick" x="665.6" y="406" width="10.4" height="16"/><text class="pick-l" x="670.8" y="417" text-anchor="middle">T</text>
+            <rect class="cell" x="676.0" y="406" width="10.4" height="16"/><text class="cell-l" x="681.2" y="417" text-anchor="middle">U</text>
+            <rect class="cell" x="686.4" y="406" width="10.4" height="16"/><text class="cell-l" x="691.6" y="417" text-anchor="middle">V</text>
+            <rect class="cell" x="696.8" y="406" width="10.4" height="16"/><text class="cell-l" x="702.0" y="417" text-anchor="middle">W</text>
+            <rect class="cell" x="707.2" y="406" width="10.4" height="16"/><text class="cell-l" x="712.4" y="417" text-anchor="middle">X</text>
+            <rect class="cell" x="717.6" y="406" width="10.4" height="16"/><text class="cell-l" x="722.8" y="417" text-anchor="middle">Y</text>
+            <rect class="cell" x="728.0" y="406" width="10.4" height="16"/><text class="cell-l" x="733.2" y="417" text-anchor="middle">Z</text>
+          </g>
+          <path class="pass" d="M670.8 422 V431 H523.2 V439" marker-end="url(#h-jev)"/>
+          <path class="leader" d="M742.4 414 H864"/>
+          <text class="mono-note" x="510" y="452" text-anchor="end">q5</text>
+          <g>
+            <rect class="cell" x="518.0" y="440" width="10.4" height="16"/><text class="cell-l" x="523.2" y="451" text-anchor="middle">A</text>
+            <rect class="cell" x="528.4" y="440" width="10.4" height="16"/><text class="cell-l" x="533.6" y="451" text-anchor="middle">B</text>
+            <rect class="cell" x="538.8" y="440" width="10.4" height="16"/><text class="cell-l" x="544.0" y="451" text-anchor="middle">C</text>
+            <rect class="cell" x="549.2" y="440" width="10.4" height="16"/><text class="cell-l" x="554.4" y="451" text-anchor="middle">D</text>
+            <rect class="cell" x="559.6" y="440" width="10.4" height="16"/><text class="cell-l" x="564.8" y="451" text-anchor="middle">E</text>
+            <rect class="cell" x="570.0" y="440" width="10.4" height="16"/><text class="cell-l" x="575.2" y="451" text-anchor="middle">F</text>
+            <rect class="cell" x="580.4" y="440" width="10.4" height="16"/><text class="cell-l" x="585.6" y="451" text-anchor="middle">G</text>
+            <rect class="cell" x="590.8" y="440" width="10.4" height="16"/><text class="cell-l" x="596.0" y="451" text-anchor="middle">H</text>
+            <rect class="cell" x="601.2" y="440" width="10.4" height="16"/><text class="cell-l" x="606.4" y="451" text-anchor="middle">I</text>
+            <rect class="cell" x="611.6" y="440" width="10.4" height="16"/><text class="cell-l" x="616.8" y="451" text-anchor="middle">J</text>
+            <rect class="cell" x="622.0" y="440" width="10.4" height="16"/><text class="cell-l" x="627.2" y="451" text-anchor="middle">K</text>
+            <rect class="cell" x="632.4" y="440" width="10.4" height="16"/><text class="cell-l" x="637.6" y="451" text-anchor="middle">L</text>
+            <rect class="cell" x="642.8" y="440" width="10.4" height="16"/><text class="cell-l" x="648.0" y="451" text-anchor="middle">M</text>
+            <rect class="cell" x="653.2" y="440" width="10.4" height="16"/><text class="cell-l" x="658.4" y="451" text-anchor="middle">N</text>
+            <rect class="cell" x="663.6" y="440" width="10.4" height="16"/><text class="cell-l" x="668.8" y="451" text-anchor="middle">O</text>
+            <rect class="cell" x="674.0" y="440" width="10.4" height="16"/><text class="cell-l" x="679.2" y="451" text-anchor="middle">P</text>
+            <rect class="cell" x="684.4" y="440" width="10.4" height="16"/><text class="cell-l" x="689.6" y="451" text-anchor="middle">Q</text>
+            <rect class="cell" x="694.8" y="440" width="10.4" height="16"/><text class="cell-l" x="700.0" y="451" text-anchor="middle">R</text>
+            <rect class="pick" x="705.2" y="440" width="10.4" height="16"/><text class="pick-l" x="710.4" y="451" text-anchor="middle">S</text>
+            <rect class="cell" x="715.6" y="440" width="10.4" height="16"/><text class="cell-l" x="720.8" y="451" text-anchor="middle">T</text>
+            <rect class="cell" x="726.0" y="440" width="10.4" height="16"/><text class="cell-l" x="731.2" y="451" text-anchor="middle">U</text>
+            <rect class="cell" x="736.4" y="440" width="10.4" height="16"/><text class="cell-l" x="741.6" y="451" text-anchor="middle">V</text>
+            <rect class="cell" x="746.8" y="440" width="10.4" height="16"/><text class="cell-l" x="752.0" y="451" text-anchor="middle">W</text>
+            <rect class="cell" x="757.2" y="440" width="10.4" height="16"/><text class="cell-l" x="762.4" y="451" text-anchor="middle">X</text>
+            <rect class="cell" x="767.6" y="440" width="10.4" height="16"/><text class="cell-l" x="772.8" y="451" text-anchor="middle">Y</text>
+            <rect class="cell" x="778.0" y="440" width="10.4" height="16"/><text class="cell-l" x="783.2" y="451" text-anchor="middle">Z</text>
+          </g>
+          <path class="leader" d="M792.4 448 H864"/>
+
+          <!-- time axis -->
+          <path class="axis" d="M318 478 H770" marker-end="url(#h-faint)"/>
+          <text class="axis-l" x="778" y="482" text-anchor="start">time</text>
+
+          <!-- prefix outputs, one per question -->
+          <!-- the word so far after each question -->
+          <rect class="out-sm" x="872" y="304" width="17" height="17"/><text class="out-sm-l" x="880.5" y="316.5" text-anchor="middle">A</text><rect class="out-sm-empty" x="892" y="304" width="17" height="17"/><rect class="out-sm-empty" x="912" y="304" width="17" height="17"/><rect class="out-sm-empty" x="932" y="304" width="17" height="17"/><rect class="out-sm-empty" x="952" y="304" width="17" height="17"/>
+          <rect class="out-sm" x="872" y="338" width="17" height="17"/><text class="out-sm-l" x="880.5" y="350.5" text-anchor="middle">A</text><rect class="out-sm" x="892" y="338" width="17" height="17"/><text class="out-sm-l" x="900.5" y="350.5" text-anchor="middle">E</text><rect class="out-sm-empty" x="912" y="338" width="17" height="17"/><rect class="out-sm-empty" x="932" y="338" width="17" height="17"/><rect class="out-sm-empty" x="952" y="338" width="17" height="17"/>
+          <rect class="out-sm" x="872" y="372" width="17" height="17"/><text class="out-sm-l" x="880.5" y="384.5" text-anchor="middle">A</text><rect class="out-sm" x="892" y="372" width="17" height="17"/><text class="out-sm-l" x="900.5" y="384.5" text-anchor="middle">E</text><rect class="out-sm" x="912" y="372" width="17" height="17"/><text class="out-sm-l" x="920.5" y="384.5" text-anchor="middle">R</text><rect class="out-sm-empty" x="932" y="372" width="17" height="17"/><rect class="out-sm-empty" x="952" y="372" width="17" height="17"/>
+          <rect class="out-sm" x="872" y="406" width="17" height="17"/><text class="out-sm-l" x="880.5" y="418.5" text-anchor="middle">A</text><rect class="out-sm" x="892" y="406" width="17" height="17"/><text class="out-sm-l" x="900.5" y="418.5" text-anchor="middle">E</text><rect class="out-sm" x="912" y="406" width="17" height="17"/><text class="out-sm-l" x="920.5" y="418.5" text-anchor="middle">R</text><rect class="out-sm" x="932" y="406" width="17" height="17"/><text class="out-sm-l" x="940.5" y="418.5" text-anchor="middle">T</text><rect class="out-sm-empty" x="952" y="406" width="17" height="17"/>
+          <rect class="out-sm" x="872" y="440" width="17" height="17"/><text class="out-sm-l" x="880.5" y="452.5" text-anchor="middle">A</text><rect class="out-sm" x="892" y="440" width="17" height="17"/><text class="out-sm-l" x="900.5" y="452.5" text-anchor="middle">E</text><rect class="out-sm" x="912" y="440" width="17" height="17"/><text class="out-sm-l" x="920.5" y="452.5" text-anchor="middle">R</text><rect class="out-sm" x="932" y="440" width="17" height="17"/><text class="out-sm-l" x="940.5" y="452.5" text-anchor="middle">T</text><rect class="out-sm" x="952" y="440" width="17" height="17"/><text class="out-sm-l" x="960.5" y="452.5" text-anchor="middle">S</text>
+          <text class="note" x="872" y="482">one letter per question, in order</text>
+
+        </g>
+
+        <line class="hair" x1="0" y1="284" x2="1060" y2="284"/>
+
+        <!-- ===================== (b) five channels ===================== -->
+        <g transform="translate(0 -226)">
+          <text class="row-letter" x="0" y="546">(b)</text>
+          <text class="row-title" x="0" y="572">Five separate channels</text>
+          <text class="row-mono" x="0" y="591">parallel-letters</text>
+          <text class="stat" x="0" y="626">5 choices</text>
+          <text class="stat-sub" x="0" y="646">× 26 options each (letters)</text>
+          <text class="stat-note" x="0" y="668">at the same moment · 1 request</text>
+
+          <rect class="frame" x="262" y="528" width="566" height="220" rx="6"/>
+          <text class="eyebrow" x="278" y="547">FIVE QUESTIONS AT ONCE: NO CHANNEL SEES ANOTHER'S ANSWER</text>
+
+          <!-- request node and fork -->
+          <circle class="req" cx="296" cy="652" r="5"/>
+          <path class="fork" d="M301 652 C320 652 320 572 346 572"/>
+          <path class="fork" d="M301 652 C320 652 320 612 346 612"/>
+          <path class="fork" d="M301 652 H346"/>
+          <path class="fork" d="M301 652 C320 652 320 692 346 692"/>
+          <path class="fork" d="M301 652 C320 652 320 732 346 732"/>
+          <!-- channel dividers -->
+          <line class="chan" x1="346" y1="592" x2="812" y2="592"/>
+          <line class="chan" x1="346" y1="632" x2="812" y2="632"/>
+          <line class="chan" x1="346" y1="672" x2="812" y2="672"/>
+          <line class="chan" x1="346" y1="712" x2="812" y2="712"/>
+
+          <!-- five letter questions in one request, one per channel -->
+          <g>
+            <rect class="cell" x="352.0" y="564" width="14.5" height="16"/><text class="cell-l" x="359.2" y="575" text-anchor="middle">A</text>
+            <rect class="cell" x="366.5" y="564" width="14.5" height="16"/><text class="cell-l" x="373.8" y="575" text-anchor="middle">B</text>
+            <rect class="cell" x="381.0" y="564" width="14.5" height="16"/><text class="cell-l" x="388.2" y="575" text-anchor="middle">C</text>
+            <rect class="cell" x="395.5" y="564" width="14.5" height="16"/><text class="cell-l" x="402.8" y="575" text-anchor="middle">D</text>
+            <rect class="cell" x="410.0" y="564" width="14.5" height="16"/><text class="cell-l" x="417.2" y="575" text-anchor="middle">E</text>
+            <rect class="cell" x="424.5" y="564" width="14.5" height="16"/><text class="cell-l" x="431.8" y="575" text-anchor="middle">F</text>
+            <rect class="cell" x="439.0" y="564" width="14.5" height="16"/><text class="cell-l" x="446.2" y="575" text-anchor="middle">G</text>
+            <rect class="cell" x="453.5" y="564" width="14.5" height="16"/><text class="cell-l" x="460.8" y="575" text-anchor="middle">H</text>
+            <rect class="cell" x="468.0" y="564" width="14.5" height="16"/><text class="cell-l" x="475.2" y="575" text-anchor="middle">I</text>
+            <rect class="cell" x="482.5" y="564" width="14.5" height="16"/><text class="cell-l" x="489.8" y="575" text-anchor="middle">J</text>
+            <rect class="cell" x="497.0" y="564" width="14.5" height="16"/><text class="cell-l" x="504.2" y="575" text-anchor="middle">K</text>
+            <rect class="cell" x="511.5" y="564" width="14.5" height="16"/><text class="cell-l" x="518.8" y="575" text-anchor="middle">L</text>
+            <rect class="cell" x="526.0" y="564" width="14.5" height="16"/><text class="cell-l" x="533.2" y="575" text-anchor="middle">M</text>
+            <rect class="cell" x="540.5" y="564" width="14.5" height="16"/><text class="cell-l" x="547.8" y="575" text-anchor="middle">N</text>
+            <rect class="cell" x="555.0" y="564" width="14.5" height="16"/><text class="cell-l" x="562.2" y="575" text-anchor="middle">O</text>
+            <rect class="cell" x="569.5" y="564" width="14.5" height="16"/><text class="cell-l" x="576.8" y="575" text-anchor="middle">P</text>
+            <rect class="cell" x="584.0" y="564" width="14.5" height="16"/><text class="cell-l" x="591.2" y="575" text-anchor="middle">Q</text>
+            <rect class="cell" x="598.5" y="564" width="14.5" height="16"/><text class="cell-l" x="605.8" y="575" text-anchor="middle">R</text>
+            <rect class="pick" x="613.0" y="564" width="14.5" height="16"/><text class="pick-l" x="620.2" y="575" text-anchor="middle">S</text>
+            <rect class="cell" x="627.5" y="564" width="14.5" height="16"/><text class="cell-l" x="634.8" y="575" text-anchor="middle">T</text>
+            <rect class="cell" x="642.0" y="564" width="14.5" height="16"/><text class="cell-l" x="649.2" y="575" text-anchor="middle">U</text>
+            <rect class="cell" x="656.5" y="564" width="14.5" height="16"/><text class="cell-l" x="663.8" y="575" text-anchor="middle">V</text>
+            <rect class="cell" x="671.0" y="564" width="14.5" height="16"/><text class="cell-l" x="678.2" y="575" text-anchor="middle">W</text>
+            <rect class="cell" x="685.5" y="564" width="14.5" height="16"/><text class="cell-l" x="692.8" y="575" text-anchor="middle">X</text>
+            <rect class="cell" x="700.0" y="564" width="14.5" height="16"/><text class="cell-l" x="707.2" y="575" text-anchor="middle">Y</text>
+            <rect class="cell" x="714.5" y="564" width="14.5" height="16"/><text class="cell-l" x="721.8" y="575" text-anchor="middle">Z</text>
+          </g>
+          <g>
+            <rect class="cell" x="352.0" y="604" width="14.5" height="16"/><text class="cell-l" x="359.2" y="615" text-anchor="middle">A</text>
+            <rect class="cell" x="366.5" y="604" width="14.5" height="16"/><text class="cell-l" x="373.8" y="615" text-anchor="middle">B</text>
+            <rect class="cell" x="381.0" y="604" width="14.5" height="16"/><text class="cell-l" x="388.2" y="615" text-anchor="middle">C</text>
+            <rect class="cell" x="395.5" y="604" width="14.5" height="16"/><text class="cell-l" x="402.8" y="615" text-anchor="middle">D</text>
+            <rect class="pick" x="410.0" y="604" width="14.5" height="16"/><text class="pick-l" x="417.2" y="615" text-anchor="middle">E</text>
+            <rect class="cell" x="424.5" y="604" width="14.5" height="16"/><text class="cell-l" x="431.8" y="615" text-anchor="middle">F</text>
+            <rect class="cell" x="439.0" y="604" width="14.5" height="16"/><text class="cell-l" x="446.2" y="615" text-anchor="middle">G</text>
+            <rect class="cell" x="453.5" y="604" width="14.5" height="16"/><text class="cell-l" x="460.8" y="615" text-anchor="middle">H</text>
+            <rect class="cell" x="468.0" y="604" width="14.5" height="16"/><text class="cell-l" x="475.2" y="615" text-anchor="middle">I</text>
+            <rect class="cell" x="482.5" y="604" width="14.5" height="16"/><text class="cell-l" x="489.8" y="615" text-anchor="middle">J</text>
+            <rect class="cell" x="497.0" y="604" width="14.5" height="16"/><text class="cell-l" x="504.2" y="615" text-anchor="middle">K</text>
+            <rect class="cell" x="511.5" y="604" width="14.5" height="16"/><text class="cell-l" x="518.8" y="615" text-anchor="middle">L</text>
+            <rect class="cell" x="526.0" y="604" width="14.5" height="16"/><text class="cell-l" x="533.2" y="615" text-anchor="middle">M</text>
+            <rect class="cell" x="540.5" y="604" width="14.5" height="16"/><text class="cell-l" x="547.8" y="615" text-anchor="middle">N</text>
+            <rect class="cell" x="555.0" y="604" width="14.5" height="16"/><text class="cell-l" x="562.2" y="615" text-anchor="middle">O</text>
+            <rect class="cell" x="569.5" y="604" width="14.5" height="16"/><text class="cell-l" x="576.8" y="615" text-anchor="middle">P</text>
+            <rect class="cell" x="584.0" y="604" width="14.5" height="16"/><text class="cell-l" x="591.2" y="615" text-anchor="middle">Q</text>
+            <rect class="cell" x="598.5" y="604" width="14.5" height="16"/><text class="cell-l" x="605.8" y="615" text-anchor="middle">R</text>
+            <rect class="cell" x="613.0" y="604" width="14.5" height="16"/><text class="cell-l" x="620.2" y="615" text-anchor="middle">S</text>
+            <rect class="cell" x="627.5" y="604" width="14.5" height="16"/><text class="cell-l" x="634.8" y="615" text-anchor="middle">T</text>
+            <rect class="cell" x="642.0" y="604" width="14.5" height="16"/><text class="cell-l" x="649.2" y="615" text-anchor="middle">U</text>
+            <rect class="cell" x="656.5" y="604" width="14.5" height="16"/><text class="cell-l" x="663.8" y="615" text-anchor="middle">V</text>
+            <rect class="cell" x="671.0" y="604" width="14.5" height="16"/><text class="cell-l" x="678.2" y="615" text-anchor="middle">W</text>
+            <rect class="cell" x="685.5" y="604" width="14.5" height="16"/><text class="cell-l" x="692.8" y="615" text-anchor="middle">X</text>
+            <rect class="cell" x="700.0" y="604" width="14.5" height="16"/><text class="cell-l" x="707.2" y="615" text-anchor="middle">Y</text>
+            <rect class="cell" x="714.5" y="604" width="14.5" height="16"/><text class="cell-l" x="721.8" y="615" text-anchor="middle">Z</text>
+          </g>
+          <g>
+            <rect class="cell" x="352.0" y="644" width="14.5" height="16"/><text class="cell-l" x="359.2" y="655" text-anchor="middle">A</text>
+            <rect class="cell" x="366.5" y="644" width="14.5" height="16"/><text class="cell-l" x="373.8" y="655" text-anchor="middle">B</text>
+            <rect class="cell" x="381.0" y="644" width="14.5" height="16"/><text class="cell-l" x="388.2" y="655" text-anchor="middle">C</text>
+            <rect class="cell" x="395.5" y="644" width="14.5" height="16"/><text class="cell-l" x="402.8" y="655" text-anchor="middle">D</text>
+            <rect class="pick" x="410.0" y="644" width="14.5" height="16"/><text class="pick-l" x="417.2" y="655" text-anchor="middle">E</text>
+            <rect class="cell" x="424.5" y="644" width="14.5" height="16"/><text class="cell-l" x="431.8" y="655" text-anchor="middle">F</text>
+            <rect class="cell" x="439.0" y="644" width="14.5" height="16"/><text class="cell-l" x="446.2" y="655" text-anchor="middle">G</text>
+            <rect class="cell" x="453.5" y="644" width="14.5" height="16"/><text class="cell-l" x="460.8" y="655" text-anchor="middle">H</text>
+            <rect class="cell" x="468.0" y="644" width="14.5" height="16"/><text class="cell-l" x="475.2" y="655" text-anchor="middle">I</text>
+            <rect class="cell" x="482.5" y="644" width="14.5" height="16"/><text class="cell-l" x="489.8" y="655" text-anchor="middle">J</text>
+            <rect class="cell" x="497.0" y="644" width="14.5" height="16"/><text class="cell-l" x="504.2" y="655" text-anchor="middle">K</text>
+            <rect class="cell" x="511.5" y="644" width="14.5" height="16"/><text class="cell-l" x="518.8" y="655" text-anchor="middle">L</text>
+            <rect class="cell" x="526.0" y="644" width="14.5" height="16"/><text class="cell-l" x="533.2" y="655" text-anchor="middle">M</text>
+            <rect class="cell" x="540.5" y="644" width="14.5" height="16"/><text class="cell-l" x="547.8" y="655" text-anchor="middle">N</text>
+            <rect class="cell" x="555.0" y="644" width="14.5" height="16"/><text class="cell-l" x="562.2" y="655" text-anchor="middle">O</text>
+            <rect class="cell" x="569.5" y="644" width="14.5" height="16"/><text class="cell-l" x="576.8" y="655" text-anchor="middle">P</text>
+            <rect class="cell" x="584.0" y="644" width="14.5" height="16"/><text class="cell-l" x="591.2" y="655" text-anchor="middle">Q</text>
+            <rect class="cell" x="598.5" y="644" width="14.5" height="16"/><text class="cell-l" x="605.8" y="655" text-anchor="middle">R</text>
+            <rect class="cell" x="613.0" y="644" width="14.5" height="16"/><text class="cell-l" x="620.2" y="655" text-anchor="middle">S</text>
+            <rect class="cell" x="627.5" y="644" width="14.5" height="16"/><text class="cell-l" x="634.8" y="655" text-anchor="middle">T</text>
+            <rect class="cell" x="642.0" y="644" width="14.5" height="16"/><text class="cell-l" x="649.2" y="655" text-anchor="middle">U</text>
+            <rect class="cell" x="656.5" y="644" width="14.5" height="16"/><text class="cell-l" x="663.8" y="655" text-anchor="middle">V</text>
+            <rect class="cell" x="671.0" y="644" width="14.5" height="16"/><text class="cell-l" x="678.2" y="655" text-anchor="middle">W</text>
+            <rect class="cell" x="685.5" y="644" width="14.5" height="16"/><text class="cell-l" x="692.8" y="655" text-anchor="middle">X</text>
+            <rect class="cell" x="700.0" y="644" width="14.5" height="16"/><text class="cell-l" x="707.2" y="655" text-anchor="middle">Y</text>
+            <rect class="cell" x="714.5" y="644" width="14.5" height="16"/><text class="cell-l" x="721.8" y="655" text-anchor="middle">Z</text>
+          </g>
+          <g>
+            <rect class="cell" x="352.0" y="684" width="14.5" height="16"/><text class="cell-l" x="359.2" y="695" text-anchor="middle">A</text>
+            <rect class="cell" x="366.5" y="684" width="14.5" height="16"/><text class="cell-l" x="373.8" y="695" text-anchor="middle">B</text>
+            <rect class="cell" x="381.0" y="684" width="14.5" height="16"/><text class="cell-l" x="388.2" y="695" text-anchor="middle">C</text>
+            <rect class="cell" x="395.5" y="684" width="14.5" height="16"/><text class="cell-l" x="402.8" y="695" text-anchor="middle">D</text>
+            <rect class="pick" x="410.0" y="684" width="14.5" height="16"/><text class="pick-l" x="417.2" y="695" text-anchor="middle">E</text>
+            <rect class="cell" x="424.5" y="684" width="14.5" height="16"/><text class="cell-l" x="431.8" y="695" text-anchor="middle">F</text>
+            <rect class="cell" x="439.0" y="684" width="14.5" height="16"/><text class="cell-l" x="446.2" y="695" text-anchor="middle">G</text>
+            <rect class="cell" x="453.5" y="684" width="14.5" height="16"/><text class="cell-l" x="460.8" y="695" text-anchor="middle">H</text>
+            <rect class="cell" x="468.0" y="684" width="14.5" height="16"/><text class="cell-l" x="475.2" y="695" text-anchor="middle">I</text>
+            <rect class="cell" x="482.5" y="684" width="14.5" height="16"/><text class="cell-l" x="489.8" y="695" text-anchor="middle">J</text>
+            <rect class="cell" x="497.0" y="684" width="14.5" height="16"/><text class="cell-l" x="504.2" y="695" text-anchor="middle">K</text>
+            <rect class="cell" x="511.5" y="684" width="14.5" height="16"/><text class="cell-l" x="518.8" y="695" text-anchor="middle">L</text>
+            <rect class="cell" x="526.0" y="684" width="14.5" height="16"/><text class="cell-l" x="533.2" y="695" text-anchor="middle">M</text>
+            <rect class="cell" x="540.5" y="684" width="14.5" height="16"/><text class="cell-l" x="547.8" y="695" text-anchor="middle">N</text>
+            <rect class="cell" x="555.0" y="684" width="14.5" height="16"/><text class="cell-l" x="562.2" y="695" text-anchor="middle">O</text>
+            <rect class="cell" x="569.5" y="684" width="14.5" height="16"/><text class="cell-l" x="576.8" y="695" text-anchor="middle">P</text>
+            <rect class="cell" x="584.0" y="684" width="14.5" height="16"/><text class="cell-l" x="591.2" y="695" text-anchor="middle">Q</text>
+            <rect class="cell" x="598.5" y="684" width="14.5" height="16"/><text class="cell-l" x="605.8" y="695" text-anchor="middle">R</text>
+            <rect class="cell" x="613.0" y="684" width="14.5" height="16"/><text class="cell-l" x="620.2" y="695" text-anchor="middle">S</text>
+            <rect class="cell" x="627.5" y="684" width="14.5" height="16"/><text class="cell-l" x="634.8" y="695" text-anchor="middle">T</text>
+            <rect class="cell" x="642.0" y="684" width="14.5" height="16"/><text class="cell-l" x="649.2" y="695" text-anchor="middle">U</text>
+            <rect class="cell" x="656.5" y="684" width="14.5" height="16"/><text class="cell-l" x="663.8" y="695" text-anchor="middle">V</text>
+            <rect class="cell" x="671.0" y="684" width="14.5" height="16"/><text class="cell-l" x="678.2" y="695" text-anchor="middle">W</text>
+            <rect class="cell" x="685.5" y="684" width="14.5" height="16"/><text class="cell-l" x="692.8" y="695" text-anchor="middle">X</text>
+            <rect class="cell" x="700.0" y="684" width="14.5" height="16"/><text class="cell-l" x="707.2" y="695" text-anchor="middle">Y</text>
+            <rect class="cell" x="714.5" y="684" width="14.5" height="16"/><text class="cell-l" x="721.8" y="695" text-anchor="middle">Z</text>
+          </g>
+          <g>
+            <rect class="cell" x="352.0" y="724" width="14.5" height="16"/><text class="cell-l" x="359.2" y="735" text-anchor="middle">A</text>
+            <rect class="cell" x="366.5" y="724" width="14.5" height="16"/><text class="cell-l" x="373.8" y="735" text-anchor="middle">B</text>
+            <rect class="cell" x="381.0" y="724" width="14.5" height="16"/><text class="cell-l" x="388.2" y="735" text-anchor="middle">C</text>
+            <rect class="cell" x="395.5" y="724" width="14.5" height="16"/><text class="cell-l" x="402.8" y="735" text-anchor="middle">D</text>
+            <rect class="pick" x="410.0" y="724" width="14.5" height="16"/><text class="pick-l" x="417.2" y="735" text-anchor="middle">E</text>
+            <rect class="cell" x="424.5" y="724" width="14.5" height="16"/><text class="cell-l" x="431.8" y="735" text-anchor="middle">F</text>
+            <rect class="cell" x="439.0" y="724" width="14.5" height="16"/><text class="cell-l" x="446.2" y="735" text-anchor="middle">G</text>
+            <rect class="cell" x="453.5" y="724" width="14.5" height="16"/><text class="cell-l" x="460.8" y="735" text-anchor="middle">H</text>
+            <rect class="cell" x="468.0" y="724" width="14.5" height="16"/><text class="cell-l" x="475.2" y="735" text-anchor="middle">I</text>
+            <rect class="cell" x="482.5" y="724" width="14.5" height="16"/><text class="cell-l" x="489.8" y="735" text-anchor="middle">J</text>
+            <rect class="cell" x="497.0" y="724" width="14.5" height="16"/><text class="cell-l" x="504.2" y="735" text-anchor="middle">K</text>
+            <rect class="cell" x="511.5" y="724" width="14.5" height="16"/><text class="cell-l" x="518.8" y="735" text-anchor="middle">L</text>
+            <rect class="cell" x="526.0" y="724" width="14.5" height="16"/><text class="cell-l" x="533.2" y="735" text-anchor="middle">M</text>
+            <rect class="cell" x="540.5" y="724" width="14.5" height="16"/><text class="cell-l" x="547.8" y="735" text-anchor="middle">N</text>
+            <rect class="cell" x="555.0" y="724" width="14.5" height="16"/><text class="cell-l" x="562.2" y="735" text-anchor="middle">O</text>
+            <rect class="cell" x="569.5" y="724" width="14.5" height="16"/><text class="cell-l" x="576.8" y="735" text-anchor="middle">P</text>
+            <rect class="cell" x="584.0" y="724" width="14.5" height="16"/><text class="cell-l" x="591.2" y="735" text-anchor="middle">Q</text>
+            <rect class="cell" x="598.5" y="724" width="14.5" height="16"/><text class="cell-l" x="605.8" y="735" text-anchor="middle">R</text>
+            <rect class="cell" x="613.0" y="724" width="14.5" height="16"/><text class="cell-l" x="620.2" y="735" text-anchor="middle">S</text>
+            <rect class="cell" x="627.5" y="724" width="14.5" height="16"/><text class="cell-l" x="634.8" y="735" text-anchor="middle">T</text>
+            <rect class="cell" x="642.0" y="724" width="14.5" height="16"/><text class="cell-l" x="649.2" y="735" text-anchor="middle">U</text>
+            <rect class="cell" x="656.5" y="724" width="14.5" height="16"/><text class="cell-l" x="663.8" y="735" text-anchor="middle">V</text>
+            <rect class="cell" x="671.0" y="724" width="14.5" height="16"/><text class="cell-l" x="678.2" y="735" text-anchor="middle">W</text>
+            <rect class="cell" x="685.5" y="724" width="14.5" height="16"/><text class="cell-l" x="692.8" y="735" text-anchor="middle">X</text>
+            <rect class="cell" x="700.0" y="724" width="14.5" height="16"/><text class="cell-l" x="707.2" y="735" text-anchor="middle">Y</text>
+            <rect class="cell" x="714.5" y="724" width="14.5" height="16"/><text class="cell-l" x="721.8" y="735" text-anchor="middle">Z</text>
+          </g>
+
+          <!-- merge -->
+          <path class="fork" d="M740 572 C780 572 780 652 812 652"/>
+          <path class="fork" d="M740 612 C780 612 780 652 812 652"/>
+          <path class="fork" d="M740 652 H812"/>
+          <path class="fork" d="M740 692 C780 692 780 652 812 652"/>
+          <path class="fork" d="M740 732 C780 732 780 652 812 652"/>
+          <path class="flow" d="M812 652 H858" marker-end="url(#h-ink)"/>
+
+          <g transform="translate(872 629)">
+            <rect class="out" x="0" y="0" width="30" height="34"/><text class="out-l" x="15" y="23" text-anchor="middle">S</text>
+            <rect class="out" x="35" y="0" width="30" height="34"/><text class="out-l" x="50" y="23" text-anchor="middle">E</text>
+            <rect class="out" x="70" y="0" width="30" height="34"/><text class="out-l" x="85" y="23" text-anchor="middle">E</text>
+            <rect class="out" x="105" y="0" width="30" height="34"/><text class="out-l" x="120" y="23" text-anchor="middle">E</text>
+            <rect class="out" x="140" y="0" width="30" height="34"/><text class="out-l" x="155" y="23" text-anchor="middle">E</text>
+          </g>
+          <text class="note" x="872" y="685">all five letters at once,</text>
+          <text class="note" x="872" y="703">chosen without seeing each other</text>
+        </g>
+
+        <line class="hair" x1="0" y1="534" x2="1060" y2="534"/>
+
+        <!-- ===================== (c) whole word ===================== -->
+        <g transform="translate(0 502)">
+          <text class="row-letter" x="0" y="68">(c)</text>
+          <text class="row-title" x="0" y="94">Whole word</text>
+          <text class="row-mono" x="0" y="113">knockout</text>
+          <text class="stat" x="0" y="148">1 word</text>
+          <text class="stat-sub" x="0" y="168">× 2,315 options, in 2 rounds</text>
+          <text class="stat-note" x="0" y="190">round 1: 10 group questions, 1 call</text>
+          <text class="stat-note" x="0" y="208">round 2: 1 final question</text>
+
+          <rect class="frame" x="262" y="50" width="566" height="192" rx="6"/>
+          <text class="eyebrow" x="278" y="69">ROUND 1 · BEST WORD IN EACH GROUP</text>
+          <text class="eyebrow" x="720" y="69">ROUND 2 · FINAL</text>
+          <!-- 2,315 answers as dots: 10 groups (255 each, the last 20), in alphabetical order -->
+          <g transform="translate(0.5 0.5)">
+            <rect class="group" x="278" y="80" width="68" height="60"/>
+            <rect class="group" x="356" y="80" width="68" height="60"/>
+            <rect class="group" x="434" y="80" width="68" height="60"/>
+            <rect class="group" x="512" y="80" width="68" height="60"/>
+            <rect class="group" x="590" y="80" width="68" height="60"/>
+            <rect class="group" x="278" y="150" width="68" height="60"/>
+            <rect class="group" x="356" y="150" width="68" height="60"/>
+            <rect class="group" x="434" y="150" width="68" height="60"/>
+            <rect class="group" x="512" y="150" width="68" height="60"/>
+            <rect class="group" x="590" y="150" width="68" height="4"/>
+            <rect class="group" x="590" y="154" width="12" height="4"/>
+          </g>
+          <!-- round 1 winners: the word each group question picked, at its real position -->
+          <rect class="pick" x="318.5" y="80.5" width="3.6" height="3.6"/><circle cx="320.3" cy="82.3" r="4.6" fill="none" stroke="var(--jev)" stroke-width="1"/>
+          <rect class="pick" x="412.5" y="80.5" width="3.6" height="3.6"/><circle cx="414.3" cy="82.3" r="4.6" fill="none" stroke="var(--jev)" stroke-width="1"/>
+          <rect class="pick" x="494.5" y="112.5" width="3.6" height="3.6"/><circle cx="496.3" cy="114.3" r="4.6" fill="none" stroke="var(--jev)" stroke-width="1"/>
+          <rect class="pick" x="564.5" y="116.5" width="3.6" height="3.6"/><circle cx="566.3" cy="118.3" r="4.6" fill="none" stroke="var(--jev)" stroke-width="1"/>
+          <rect class="pick" x="622.5" y="104.5" width="3.6" height="3.6"/><circle cx="624.3" cy="106.3" r="4.6" fill="none" stroke="var(--jev)" stroke-width="1"/>
+          <rect class="pick" x="290.5" y="186.5" width="3.6" height="3.6"/><circle cx="292.3" cy="188.3" r="4.6" fill="none" stroke="var(--jev)" stroke-width="1"/>
+          <rect class="pick" x="380.5" y="182.5" width="3.6" height="3.6"/><circle cx="382.3" cy="184.3" r="4.6" fill="none" stroke="var(--jev)" stroke-width="1"/>
+          <rect class="pick" x="446.5" y="186.5" width="3.6" height="3.6"/><circle cx="448.3" cy="188.3" r="4.6" fill="none" stroke="var(--jev)" stroke-width="1"/>
+          <rect class="pick" x="512.5" y="150.5" width="3.6" height="3.6"/><circle cx="514.3" cy="152.3" r="4.6" fill="none" stroke="var(--jev)" stroke-width="1"/>
+          <rect class="pick" x="622.5" y="150.5" width="3.6" height="3.6"/><circle cx="624.3" cy="152.3" r="4.6" fill="none" stroke="var(--jev)" stroke-width="1"/>
+          <!-- hand-off to the final round -->
+          <path class="pass" d="M666 145 H712" marker-end="url(#h-jev)"/>
+          <text class="mono-note" x="689" y="138" text-anchor="middle">winners</text>
+          <!-- round 2: one question over the 10 group winners -->
+          <rect class="pick" x="720" y="80" width="88" height="12"/><text class="pick-l" x="764" y="89" text-anchor="middle" style="font-size: 8.5px">ABOUT</text>
+          <rect class="cell" x="720" y="93" width="88" height="12"/><text class="cell-l" x="764" y="102" text-anchor="middle" style="font-size: 8.5px">BREAD</text>
+          <rect class="cell" x="720" y="106" width="88" height="12"/><text class="cell-l" x="764" y="115" text-anchor="middle" style="font-size: 8.5px">ENTER</text>
+          <rect class="cell" x="720" y="119" width="88" height="12"/><text class="cell-l" x="764" y="128" text-anchor="middle" style="font-size: 8.5px">GUESS</text>
+          <rect class="cell" x="720" y="132" width="88" height="12"/><text class="cell-l" x="764" y="141" text-anchor="middle" style="font-size: 8.5px">LIGHT</text>
+          <rect class="cell" x="720" y="145" width="88" height="12"/><text class="cell-l" x="764" y="154" text-anchor="middle" style="font-size: 8.5px">PLANT</text>
+          <rect class="cell" x="720" y="158" width="88" height="12"/><text class="cell-l" x="764" y="167" text-anchor="middle" style="font-size: 8.5px">SCORE</text>
+          <rect class="cell" x="720" y="171" width="88" height="12"/><text class="cell-l" x="764" y="180" text-anchor="middle" style="font-size: 8.5px">STORE</text>
+          <rect class="cell" x="720" y="184" width="88" height="12"/><text class="cell-l" x="764" y="193" text-anchor="middle" style="font-size: 8.5px">THERE</text>
+          <rect class="cell" x="720" y="197" width="88" height="12"/><text class="cell-l" x="764" y="206" text-anchor="middle" style="font-size: 8.5px">WROTE</text>
+          <text class="note" x="278" y="230">each dot is one possible answer · 10 groups of ≤ 255, asked in one call · ringed: each group's pick</text>
+
+          <path class="flow" d="M828 139 H858" marker-end="url(#h-ink)"/>
+          <g transform="translate(872 116)">
+            <rect class="out" x="0" y="0" width="30" height="34"/><text class="out-l" x="15" y="23" text-anchor="middle">A</text>
+            <rect class="out" x="35" y="0" width="30" height="34"/><text class="out-l" x="50" y="23" text-anchor="middle">B</text>
+            <rect class="out" x="70" y="0" width="30" height="34"/><text class="out-l" x="85" y="23" text-anchor="middle">O</text>
+            <rect class="out" x="105" y="0" width="30" height="34"/><text class="out-l" x="120" y="23" text-anchor="middle">U</text>
+            <rect class="out" x="140" y="0" width="30" height="34"/><text class="out-l" x="155" y="23" text-anchor="middle">T</text>
+          </g>
+          <text class="note" x="872" y="172">all five letters in one pick</text>
+          <text class="note" x="872" y="190">always a real word</text>
+
+        </g>
+      </svg>
+    </div>
+
+    <div class="legend" aria-hidden="true">
+      <span><i class="sw-opt"></i>an option Jev can choose</span>
+      <span><i class="sw-pick"></i>Jev's pick (highest probability)</span>
+      <span><i class="sw-pass"></i>pick passed to the next question</span>
+      <span><i class="sw-chan"></i>separate channel</span>
+    </div>
+
+    <figcaption id="fig1-cap">
+      <b>Figure 1.</b> The same first guess, asked three ways. In (a) there are five questions whose options are
+      letters, asked in order; each one is told the letters already chosen, so the word is built left to right over five
+      requests. In (b) the same five letter questions go out in one request, and each is answered independently, so every
+      square picks the letter most likely in its own position without knowing the others. In (c) the options are whole
+      words: round 1 asks one question per group of up to 255 words, all in a single call, and round 2 picks among the
+      ten group winners, so the five letters arrive together and always spell a real word. The example guesses are the
+      first attempts each approach actually produced.
+    </figcaption>
+  </figure>
+
+  <section class="col">
+    <h2 class="section"><span class="num">1</span>The three framings</h2>
+    <p>
+      In every framing, code reads the colored tiles after each guess and removes what they rule out before Jev is
+      asked; Wordle itself rejects any non-word, and a rejected word is added to Jev's context for the next try.
+    </p>
+    <div class="approach">
+      <h3>(a) One letter at a time<span class="mono">letter-by-letter</span></h3>
+      <p>
+        Jev answers <em>which letter goes in square N?</em> five times, in order. Each question shows the word so far
+        (<span class="mono">A E _ _ _</span>) and the word start each option would make, and asks for a letter that can
+        still finish a real word. Squares already confirmed green are filled without asking.
+      </p>
+    </div>
+    <div class="approach">
+      <h3>(b) Five separate channels<span class="mono">parallel-letters</span></h3>
+      <p>
+        The same five letter questions are sent together in a single request. Each is told the others are being chosen
+        at the same moment, but none can see their answers, because every question in a request is evaluated on its
+        own.<sup><a href="#n1" id="r1">1</a></sup>
+      </p>
+    </div>
+    <div class="approach">
+      <h3>(c) Whole word<span class="mono">knockout</span></h3>
+      <p>
+        Jev answers <em>which word should be guessed next?</em> The options are the answers that still fit every clue,
+        all 2,315 before the first guess. A choice question accepts at most 255 options, so the list goes out as groups
+        of up to 255 in one request, and a final question picks among the group winners.
+      </p>
+    </div>
+  </section>
+
+  <section class="col">
+    <h2 class="section"><span class="num">2</span>Why the framing matters</h2>
+    <p>
+      TypeSafe describes each question as “a gut-check determination.”<sup><a href="#n2" id="r2">2</a></sup> Choosing
+      among real words is that kind of judgment: the options are complete, and the model only has to prefer one. Building
+      a word from letters is composition, a plan spread across five decisions. In (a) that plan has to survive five
+      separate questions, each seeing only the letters before it. In (b) there is no shared plan at all, and each channel
+      reasonably settles on the most common letter for its position, which is how <span class="mono">S E E E E</span>
+      happens.
+    </p>
+    <p>
+      The same property that makes (b) fail makes (c) work. Independent evaluation is exactly what a knockout over groups
+      of words needs, since each group should be judged on its own. The lesson is to put exact rules, like which words
+      still fit, in code, and to give the model complete options to choose between.
+    </p>
+  </section>
+
+  <footer class="col notes">
+    <ol>
+      <li id="n1">TypeSafe AI, <a href="https://docs.typesafe.ai/cookbooks/parallel_questions.md">Parallel questions</a>: “each question is scored on its own against the document.” <a href="#r1" aria-label="Back to text">↩</a></li>
+      <li id="n2">TypeSafe AI, <a href="https://docs.typesafe.ai/introduction">Introduction</a> and <a href="https://docs.typesafe.ai/concepts/how-to-build-with-system-one.md">How to build with System One</a>. <a href="#r2" aria-label="Back to text">↩</a></li>
+    </ol>
+  </footer>
+</main>

@@ -1,10 +1,9 @@
-# Only pkmn_shwdn/ is tracked in this repo
-/wordle/
-
 .venv/
 __pycache__/
 node_modules/
 .env
 /pkmn_shwdn/videos/*
 !/pkmn_shwdn/videos/*.mp4
+/wordle/videos/
+/wordle/runs/
 *.log

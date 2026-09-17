@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wordle</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#121213; --fg:#f8f8f8; --border:#3a3a3c; --filled:#565758; --key:#818384;
+          --correct:#538d4e; --present:#b59f3b; --absent:#3a3a3c; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family: "Helvetica Neue", Arial, sans-serif;
+         display:flex; flex-direction:column; align-items:center; min-height:100vh; }
+  header { width:100%; text-align:center; border-bottom:1px solid var(--border); padding:10px 0;
+           font-size:32px; font-weight:700; letter-spacing:.04em; }
+  #board { display:grid; grid-template-rows:repeat(6, 62px); gap:5px; margin:28px 0 20px; }
+  .row { display:grid; grid-template-columns:repeat(5, 62px); gap:5px; }
+  .row.shake { animation: shake .4s; }
+  .tile { border:2px solid var(--border); display:flex; align-items:center; justify-content:center;
+          font-size:32px; font-weight:700; text-transform:uppercase; }
+  .tile[data-state="tbd"] { border-color:var(--filled); animation: pop .1s; }
+  .tile[data-state="correct"], .tile[data-state="present"], .tile[data-state="absent"] { border-color:transparent; }
+  .tile[data-state="correct"] { background:var(--correct); }
+  .tile[data-state="present"] { background:var(--present); }
+  .tile[data-state="absent"]  { background:var(--absent); }
+  .tile.flip { animation: flip .5s ease-in; }
+  #keyboard { display:flex; flex-direction:column; gap:8px; margin-bottom:24px; }
+  .krow { display:flex; gap:6px; justify-content:center; }
+  .key { background:var(--key); color:var(--fg); border:0; border-radius:4px; height:58px; min-width:43px;
+         font-weight:700; font-size:14px; text-transform:uppercase; }
+  .key.wide { min-width:66px; font-size:12px; }
+  .key[data-state="correct"] { background:var(--correct); }
+  .key[data-state="present"] { background:var(--present); }
+  .key[data-state="absent"]  { background:var(--absent); }
+  #toast { position:fixed; top:70px; left:50%; transform:translateX(-50%); background:var(--fg); color:#000;
+           padding:12px 16px; border-radius:4px; font-weight:700; display:none; z-index:10; }
+  @keyframes pop { 50% { transform:scale(1.1); } }
+  @keyframes flip { 0% { transform:rotateX(0) } 50% { transform:rotateX(-90deg) } 100% { transform:rotateX(0) } }
+  @keyframes shake { 20%,60% { transform:translateX(-6px) } 40%,80% { transform:translateX(6px) } }
+</style>
+</head>
+<body>
+<header>Wordle</header>
+<div id="toast"></div>
+<div id="board"></div>
+<div id="keyboard"></div>
+<script>
+(async () => {
+  const words = (await (await fetch('answers.txt')).text()).split(/\s+/).filter(w => w.length === 5);
+  const params = new URLSearchParams(location.search);
+  const secret = (params.get('word') || words[Math.floor(Math.random() * words.length)]).toLowerCase();
+  window.__wordleSecret = secret; // read by the engine only after the game ends, for the result screen
+  const guesses =(await (await fetch('guesses.txt')).text()).split(/\s+/).filter(w => w.length === 5);
+  const allowed = new Set([...words, ...guesses]);
+
+  const board = document.getElementById('board');
+  for (let r = 0; r < 6; r++) {
+    const row = document.createElement('div'); row.className = 'row';
+    for (let c = 0; c < 5; c++) {
+      const t = document.createElement('div'); t.className = 'tile'; t.dataset.state = 'empty'; row.appendChild(t);
+    }
+    board.appendChild(row);
+  }
+  const kb = document.getElementById('keyboard');
+  for (const line of ['qwertyuiop', 'asdfghjkl', '+zxcvbnm-']) {
+    const kr = document.createElement('div'); kr.className = 'krow';
+    for (const ch of line) {
+      const b = document.createElement('button'); b.className = 'key';
+      if (ch === '+') { b.textContent = 'enter'; b.dataset.key = 'Enter'; b.classList.add('wide'); }
+      else if (ch === '-') { b.textContent = '⌫'; b.dataset.key = 'Backspace'; b.classList.add('wide'); }
+      else { b.textContent = ch; b.dataset.key = ch; }
+      b.onclick = () => handle(b.dataset.key);
+      kr.appendChild(b);
+    }
+    kb.appendChild(kr);
+  }
+
+  let row = 0, cur = '', over = false;
+  const toast = (msg, ms = 1500) => {
+    const el = document.getElementById('toast'); el.textContent = msg; el.style.display = 'block';
+    if (ms) setTimeout(() => el.style.display = 'none', ms);
+  };
+  const score = (guess, answer) => {
+    const res = Array(5).fill('absent'), left = {};
+    for (let i = 0; i < 5; i++) guess[i] === answer[i] ? res[i] = 'correct' : left[answer[i]] = (left[answer[i]] || 0) + 1;
+    for (let i = 0; i < 5; i++) if (res[i] !== 'correct' && left[guess[i]] > 0) { res[i] = 'present'; left[guess[i]]--; }
+    return res;
+  };
+  const rank = { absent: 1, present: 2, correct: 3 };
+  const render = () => {
+    const tiles = board.children[row].children;
+    for (let i = 0; i < 5; i++) { tiles[i].textContent = cur[i] || ''; tiles[i].dataset.state = cur[i] ? 'tbd' : 'empty'; }
+  };
+
+  async function submit() {
+    const rowEl = board.children[row];
+    if (cur.length < 5 || !allowed.has(cur)) {
+      document.body.dataset.submit = 'invalid';
+      toast(cur.length < 5 ? 'Not enough letters' : 'Not in word list');
+      rowEl.classList.remove('shake'); void rowEl.offsetWidth; rowEl.classList.add('shake');
+      return;
+    }
+    document.body.dataset.submit = 'accepted';
+    over = true; // lock input during reveal
+    document.body.dataset.busy = 'true';
+    const res = score(cur, secret);
+    for (let i = 0; i < 5; i++) {
+      const t = rowEl.children[i]; t.classList.add('flip');
+      await new Promise(r => setTimeout(r, 250));
+      t.dataset.state = res[i];
+      await new Promise(r => setTimeout(r, 120));
+      const k = kb.querySelector(`[data-key="${cur[i]}"]`);
+      if ((rank[res[i]] || 0) > (rank[k.dataset.state] || 0)) k.dataset.state = res[i];
+    }
+    const won = res.every(s => s === 'correct');
+    row++; cur = '';
+    document.body.dataset.busy = 'false';
+    if (won) { document.body.dataset.result = 'won'; toast(['Genius','Magnificent','Impressive','Splendid','Great','Phew'][row - 1], 0); return; }
+    if (row === 6) { document.body.dataset.result = 'lost'; toast(secret.toUpperCase(), 0); return; }
+    over = false;
+  }
+
+  function handle(key) {
+    if (over) return;
+    if (key === 'Enter') return submit();
+    if (key === 'Backspace') { cur = cur.slice(0, -1); return render(); }
+    if (/^[a-z]$/i.test(key) && cur.length < 5) { cur += key.toLowerCase(); render(); }
+  }
+  document.addEventListener('keydown', e => handle(e.key));
+  document.body.dataset.ready = 'true';
+})();
+</script>
+</body>
+</html>
