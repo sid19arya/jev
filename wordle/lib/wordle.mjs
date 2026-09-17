@@ -57,3 +57,24 @@ export function describeLetterClues(letter, pos, history) {
   if (grey) notes.push('also grey once, so the word has no extra copies of it');
   return notes.length ? notes.join('; ') : 'no color clues yet';
 }
+
+/**
+ * Letters still possible in each square, from the colored tiles alone: [[...letters for square 1], …×5].
+ *   green in square N  → square N can only be that letter
+ *   yellow in square N → that letter is removed from square N
+ *   grey in square N   → removed from square N; removed everywhere only if the letter was never green or yellow
+ *                        (a grey duplicate, e.g. the second E in SPEED, only means there's no extra copy)
+ */
+export function allowedLetters(history) {
+  const alphabet = [...'abcdefghijklmnopqrstuvwxyz'];
+  const present = new Set(history.flatMap(row => row.filter(t => t.state !== 'absent').map(t => t.letter)));
+  const squares = Array.from({ length: 5 }, () => new Set(alphabet));
+  for (const row of history) row.forEach((t, i) => {
+    if (t.state === 'correct') squares[i] = new Set([t.letter]);
+    else if (squares[i].size > 1) {
+      squares[i].delete(t.letter);
+      if (t.state === 'absent' && !present.has(t.letter)) for (const s of squares) if (s.size > 1) s.delete(t.letter);
+    }
+  });
+  return squares.map(s => [...s]);
+}

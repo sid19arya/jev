@@ -7,8 +7,8 @@ the in-page panel. A profile only decides the next guess.
 | Profile | How Jev plays | Calls per guess | Notes |
 |---|---|---|---|
 | `knockout` (default) | Code filters answers that fit every clue; Jev picks one word. If >255 fit, one call with a Choice question per group of ≤255, then a final. | 1–2 | Won 20/20 in testing, ~3.9 guesses, ~$0.0015/game. |
-| `letter-by-letter` | Jev picks each letter from A–Z, one call per square. No filtering, so non-words hit the wall and it retries. | 5 per try | Reference point: rarely spells a real word. 25 tries per guess; rejected words stay in its context all game. |
-| `parallel-letters` | One call per try with 5 Choice questions, one per square (A–Z each). Questions are evaluated independently, so squares can't see each other's picks. Non-words hit the wall. | 1 per try | Reference point for independent parallel questions composing one answer. |
+| `letter-by-letter` | Jev picks each letter in order, one call per open square. Letters are pruned by the tiles (green fills its square, yellow is removed from its square, grey is removed everywhere) but nothing checks for real words, so non-words hit the wall and it retries. | ≤5 per try | Reference point: rarely spells a real word. 25 tries per guess; rejected words stay in its context all game. |
+| `parallel-letters` | One call per try with a Choice question per open square, letters pruned by the tiles like letter-by-letter. Questions are evaluated independently, so squares can't see each other's picks. Non-words hit the wall. | 1 per try | Reference point for independent parallel questions composing one answer. |
 
 ## Running
 
@@ -61,4 +61,5 @@ limit are stopped and marked `timeout`. Each run is saved to `runs/versus-<stamp
 
 - `summary.md` / `summary.json`: result, accepted and rejected words, valid-word rate, Jev calls, tokens, cost, latency, time
 - `side-by-side.mp4`: all games in one video, labelled, with each result shown when that game finishes
+- `side-by-side-fast.mp4`: the same, switching to 4× speed about 2.5s after the first game finishes
 - `<profile>.mp4`: each game on its own; `events.jsonl`: every guess, rejection and usage update

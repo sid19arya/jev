@@ -6,7 +6,8 @@
 //
 // Each profile gets its own Chromium window (tiled across the top of the screen on Windows) and the terminal
 // shows a live dashboard. Output goes to runs/versus-<stamp>/: events.jsonl, summary.json, summary.md,
-// one MP4 per profile and a labelled side-by-side MP4 (needs ffmpeg on PATH).
+// one MP4 per profile, a labelled side-by-side MP4, and side-by-side-fast.mp4, which plays at normal speed until
+// shortly after the first game finishes and then at 4× (needs ffmpeg on PATH).
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -194,7 +195,8 @@ const results = games.map(g => {
 // Videos: name per profile, then an MP4 each and a labelled side-by-side.
 const ffmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
 const videos = [];
-let sideBySide = null;
+let sideBySide = null, sideBySideFast = null;
+const FAST_SPEED = 4;
 if (video) {
   for (const r of results) {
     if (!r.video || !fs.existsSync(r.video)) continue;
@@ -231,11 +233,28 @@ if (video) {
       `${filters.join(';')};${videos.map((_, i) => `[v${i}]`).join('')}hstack=inputs=${videos.length},scale=1920:-2[out]`,
       '-map', '[out]', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', target],
     { stdio: 'inherit' });
-    if (res.status === 0) sideBySide = path.basename(target);
+    if (res.status === 0) {
+      sideBySide = path.basename(target);
+      // Fast version: normal speed until ~2.5s after the first game shows its result (its end event lands about
+      // 2s after the final board, which the engine holds on screen), then 4× for the rest.
+      const firstEnd = Math.min(...videos.map(r => ((r.finishedMs ?? Infinity) - (r.videoStartMs ?? 0)) / 1000));
+      const speedFrom = firstEnd + 0.5;
+      if (Number.isFinite(speedFrom) && longest - speedFrom > 5) {
+        const fast = path.join(runDir, 'side-by-side-fast.mp4');
+        const fastRes = spawnSync('ffmpeg', ['-loglevel', 'error', '-y', '-i', target, '-filter_complex',
+          `[0:v]split=2[a][b];[a]trim=0:${speedFrom.toFixed(2)},setpts=PTS-STARTPTS[a1];` +
+          `[b]trim=start=${speedFrom.toFixed(2)},setpts=(PTS-STARTPTS)/${FAST_SPEED},fps=25,` +
+          `drawtext=${fontArg}text='${FAST_SPEED}x speed':expansion=none:x=w-text_w-24:y=h-text_h-18:fontsize=28:fontcolor=white:box=1:boxcolor=0x000000@0.6:boxborderw=10[b1];` +
+          '[a1][b1]concat=n=2:v=1:a=0[out]',
+          '-map', '[out]', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', fast],
+        { stdio: 'inherit' });
+        if (fastRes.status === 0) sideBySideFast = path.basename(fast);
+      }
+    }
   }
 }
 
-const summary = { stamp, model: MODEL_ID, secret: word, timeLimitMin, elapsedMs: Date.now() - started, results, sideBySide };
+const summary = { stamp, model: MODEL_ID, secret: word, timeLimitMin, elapsedMs: Date.now() - started, results, sideBySide, sideBySideFast };
 fs.writeFileSync(path.join(runDir, 'summary.json'), JSON.stringify(summary, null, 2));
 fs.writeFileSync(path.join(runDir, 'summary.md'), summaryMarkdown(summary));
 
@@ -255,7 +274,7 @@ function summaryMarkdown(s) {
     '',
     `- Secret word: **${s.secret.toUpperCase()}**`,
     `- Model: \`${s.model}\` via Vercel AI Gateway · time limit ${s.timeLimitMin} min · total run ${ms(s.elapsedMs)}`,
-    `- All profiles played the same word at the same time${s.sideBySide ? ' · video: `' + s.sideBySide + '`' : ''}`,
+    `- All profiles played the same word at the same time${s.sideBySide ? ' · video: `' + s.sideBySide + '`' + (s.sideBySideFast ? ' (sped up: `' + s.sideBySideFast + '`)' : '') : ''}`,
     '',
     `| Metric | ${rs.map(r => `${r.title} (\`${r.profile}\`)`).join(' | ')} |`,
     `|---|${rs.map(() => '---').join('|')}|`,
