@@ -1,0 +1,17 @@
+# Render Blueprint: the Wordle explainer page as a static site.
+# Create it once from the Render dashboard (New → Blueprint → this repo); Render reads this file.
+services:
+  - type: web
+    runtime: static
+    name: jev-wordle-explainer
+    rootDir: wordle/docs
+    buildCommand: node build.mjs
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
