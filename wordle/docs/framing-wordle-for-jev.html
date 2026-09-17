@@ -84,12 +84,13 @@
     font-family: var(--sans);
     font-size: 14px;
     color: var(--muted);
-    margin: 0 0 32px;
+    margin: 0 0 8px;
     display: flex;
     flex-wrap: wrap;
     gap: 4px 18px;
   }
   .byline code { font-family: var(--mono); font-size: 13px; color: var(--ink); }
+  .abstract.col { margin-top: 44px; }
   .abstract {
     border-top: 1px solid var(--rule-strong);
     border-bottom: 1px solid var(--rule);
@@ -118,7 +119,7 @@
   a:focus-visible { outline: 2px solid var(--jev); outline-offset: 2px; }
 
   /* ---------- figure ---------- */
-  figure { margin: 44px 0 0; }
+  figure { margin: 28px 0 0; }
   .figure-scroll { overflow-x: auto; padding-bottom: 4px; }
   .figure-scroll svg { display: block; width: 100%; min-width: 900px; height: auto; color: var(--ink); }
   figcaption { font-size: 15px; line-height: 1.55; max-width: 68ch; margin: 20px auto 0; }
@@ -201,34 +202,6 @@
       <span>Harness: Playwright + Chromium</span>
       <span>September 2026</span>
     </p>
-    <section class="abstract" aria-labelledby="abstract-h">
-      <h2 id="abstract-h">Abstract</h2>
-      <p>
-        Getting Jev to play Wordle is a good case study in what a decision model can and can't do. Jev does not write
-        text; it answers typed <em>choice</em> questions with a probability for every option. So a guess has to be framed
-        as choices, and there are three ways to do it:
-      </p>
-      <ol>
-        <li>
-          <strong>One letter at a time</strong> struggles. Each question sees the letters typed so far but not the word the
-          earlier questions were aiming for, so it plays greedily: a yellow H gets pushed into every open square
-          (<span class="mono">BOHIH</span>, <span class="mono">BOHIH</span>, …) instead of the word being re-planned.
-        </li>
-        <li>
-          <strong>Five separate channels</strong>, all letters at once, is degenerate. Each square is its own question and
-          cannot see the others, so every square picks its most common letter: <span class="mono">SEEEE</span>.
-        </li>
-        <li>
-          <strong>Whole word</strong> works, once the size is handled. A choice question takes at most 255 options, so the
-          <em>n</em> possible words are split into <em>m</em> groups with <em>m</em> × 255 ≥ <em>n</em>, all <em>m</em> are
-          asked in one call, and a final round picks among the group winners. It is fast and effective.
-        </li>
-      </ol>
-      <p>
-        The catch: code must first remove the words that contradict the clues. Left to do that itself, Jev drifts to
-        look-alike words that break the rules. Exact rules belong in code; the judgment call belongs to the model.
-      </p>
-    </section>
   </header>
 
   <figure aria-labelledby="fig1-cap">
@@ -708,6 +681,35 @@
       first attempts each approach actually produced.
     </figcaption>
   </figure>
+
+  <section class="abstract col" aria-labelledby="abstract-h">
+      <h2 id="abstract-h">Abstract</h2>
+      <p>
+        Getting Jev to play Wordle is a good case study in what a decision model can and can't do. Jev does not write
+        text; it answers typed <em>choice</em> questions with a probability for every option. So a guess has to be framed
+        as choices, and there are three ways to do it:
+      </p>
+      <ol>
+        <li>
+          <strong>One letter at a time</strong> struggles. Each question sees the letters typed so far but not the word the
+          earlier questions were aiming for, so it plays greedily: a yellow H gets pushed into every open square
+          (<span class="mono">BOHIH</span>, <span class="mono">BOHIH</span>, …) instead of the word being re-planned.
+        </li>
+        <li>
+          <strong>Five separate channels</strong>, all letters at once, is degenerate. Each square is its own question and
+          cannot see the others, so every square picks its most common letter: <span class="mono">SEEEE</span>.
+        </li>
+        <li>
+          <strong>Whole word</strong> works, once the size is handled. A choice question takes at most 255 options, so the
+          <em>n</em> possible words are split into <em>m</em> groups with <em>m</em> × 255 ≥ <em>n</em>, all <em>m</em> are
+          asked in one call, and a final round picks among the group winners. It is fast and effective.
+        </li>
+      </ol>
+      <p>
+        The catch: code must first remove the words that contradict the clues. Left to do that itself, Jev drifts to
+        look-alike words that break the rules. Exact rules belong in code; the judgment call belongs to the model.
+      </p>
+  </section>
 
   <section class="col">
     <h2 class="section"><span class="num">1</span>The three framings</h2>
