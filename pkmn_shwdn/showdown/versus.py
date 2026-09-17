@@ -150,7 +150,9 @@ async def run_versus(profiles, fmt="gen9randombattle", headless=False):
     summary = {"battle_url": f"https://play.pokemonshowdown.com/{room_id}", "format": fmt, "result": result,
                "turns": turns, "duration_s": round(duration, 1), "players": players}
 
-    (LOGS / f"versus-{stamp}-summary.json").write_text(json.dumps(summary, indent=2, default=str), encoding="utf-8")
+    # file names only: the summary is meant to be shareable, so no absolute local paths
+    shareable = {**summary, "players": [{**pl, "video": pl["video"].name if pl["video"] else None} for pl in players]}
+    (LOGS / f"versus-{stamp}-summary.json").write_text(json.dumps(shareable, indent=2), encoding="utf-8")
     md = markdown_summary(summary)
     (LOGS / f"versus-{stamp}-summary.md").write_text(md, encoding="utf-8")
     print("\n" + md, flush=True)

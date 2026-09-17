@@ -74,3 +74,40 @@ Metric sources: Jev's cost is the amount the gateway billed (`providerMetadata.g
 the gateway's provider timing. Claude's tokens, cost (an API-rate estimate, not what a subscription is billed) and
 API latency come from `claude -p --output-format json`. Wall latency is measured by the harness and includes
 process start-up.
+
+## Results: Claude Opus 5 vs Jev (1 game)
+
+One head-to-head game in versus mode, Gen 9 Random Battle, recorded September 2026.
+Full numbers: [`results/versus-20260917-001155-summary.json`](results/versus-20260917-001155-summary.json).
+
+**Jev won** after 33 turns (about 11 minutes). It came down to the last Pokémon on each side: Opus's Dudunsparce
+had used Calm Mind twice and got Jev's Chimecho to 26%, but it was at 10% HP and slower, and Chimecho's
+Psychic Noise finished it.
+
+| | Claude Opus 5 (`claude-code`) | Jev (`jev`) |
+|---|---|---|
+| Result | lost | **won** |
+| Decisions | 40 | 38 |
+| Fallback clicks (errors) | 0 | 0 |
+| Tokens in (total / per decision) | 152,901 / 3,823 | 67,923 / 1,787 |
+| Tokens out (total / per decision) | 27,488 / 687 (17,855 thinking) | 2,582 / 68 |
+| Cost (total / per decision) | $2.35 / $0.059 | $0.0029 / $0.000075 |
+| Decision latency, mean / median / p95 | 9.97s / 9.02s / 21.5s | 0.97s / 0.91s / 1.44s |
+| Model API latency, mean / median / p95 | 9.49s / 8.37s / 21.4s | 0.24s / 0.22s / 0.47s |
+| Total thinking time | 6m 39s | 37s |
+
+How to read it:
+
+- **One game.** Random Battles give each side a random team, so a single game says little about playing
+  strength. What carries over is the cost and latency profile.
+- **Cost sources differ.** Jev's cost is the amount Vercel AI Gateway billed for each call. Opus's cost is
+  the `total_cost_usd` that `claude -p` reports for each call: Claude Code's own estimate at API rates, not
+  what a Claude subscription is charged.
+- **Opus's cost includes cache writes that never paid off.** Claude Code wrote nearly every input token
+  (152,821 of 152,901) to its 1-hour prompt cache. Each decision starts a fresh session, so the cache was
+  never read back. Cache writes are priced above plain input, so a direct API call without caching would
+  cost less.
+- **Decision latency** is measured by the harness and includes process start-up (`claude` or `node`);
+  **API latency** is the model time reported by each provider.
+- Opus made each decision with its reasoning in a JSON reply; Jev answered one composite Choice question
+  over every legal action and returned a probability for each (see the `jev` profile above).
