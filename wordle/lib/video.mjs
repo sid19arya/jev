@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 
 const PAGE = { width: 1100, height: 760 };
 const FAST_SPEED = 4;
+const END_HOLD_S = 3; // both side-by-side videos hold their final frame this long
 
 export const hasFfmpeg = () => spawnSync('ffmpeg', ['-version']).status === 0;
 
@@ -58,20 +59,22 @@ export function buildVideos(runDir, results, { contentScale = 1 } = {}) {
   });
   const sideBySide = path.join(runDir, 'side-by-side.mp4');
   if (!run([...videos.flatMap(r => ['-i', r.mp4]), '-filter_complex',
-    `${filters.join(';')};${videos.map((_, i) => `[v${i}]`).join('')}hstack=inputs=${videos.length},scale=1920:-2[out]`,
+    `${filters.join(';')};${videos.map((_, i) => `[v${i}]`).join('')}hstack=inputs=${videos.length},scale=1920:-2,` +
+    `tpad=stop_mode=clone:stop_duration=${END_HOLD_S}[out]`,
     '-map', '[out]', ...encode, sideBySide])) return out;
   out.sideBySide = path.basename(sideBySide);
 
   // Fast version: normal speed until ~2.5s after the first game shows its result (its end event lands about 2s after
-  // the final board, which the engine holds on screen), then 4× for the rest.
+  // the final board, which the engine holds on screen), then 4× until the games end, then its own end hold.
+  const gamesEnd = longest + 0.5; // the composite's length before its end hold
   const speedFrom = Math.min(...videos.map(r => ((r.finishedMs ?? Infinity) - (r.videoStartMs ?? 0)) / 1000)) + 0.5;
   if (Number.isFinite(speedFrom) && longest - speedFrom > 5) {
     const fast = path.join(runDir, 'side-by-side-fast.mp4');
     if (run(['-i', sideBySide, '-filter_complex',
       `[0:v]split=2[a][b];[a]trim=0:${speedFrom.toFixed(2)},setpts=PTS-STARTPTS[a1];` +
-      `[b]trim=start=${speedFrom.toFixed(2)},setpts=(PTS-STARTPTS)/${FAST_SPEED},fps=25,` +
+      `[b]trim=start=${speedFrom.toFixed(2)}:end=${gamesEnd.toFixed(2)},setpts=(PTS-STARTPTS)/${FAST_SPEED},fps=25,` +
       `drawtext=${fontArg}text='${FAST_SPEED}x speed':expansion=none:x=w-text_w-24:y=h-text_h-18:fontsize=28:fontcolor=white:box=1:boxcolor=0x000000@0.6:boxborderw=10[b1];` +
-      '[a1][b1]concat=n=2:v=1:a=0[out]',
+      `[a1][b1]concat=n=2:v=1:a=0,tpad=stop_mode=clone:stop_duration=${END_HOLD_S}[out]`,
       '-map', '[out]', ...encode, fast])) out.sideBySideFast = path.basename(fast);
   }
   return out;
