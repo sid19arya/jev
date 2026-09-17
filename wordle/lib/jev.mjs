@@ -21,17 +21,20 @@ export const ranked = answer => Object.entries(answer.probabilities ?? { [answer
  */
 export function createJev(modelId = MODEL_ID) {
   const model = gateway.evaluationModel(modelId);
-  const totals = { calls: 0, unmeteredCalls: 0, inputTokens: 0, outputTokens: 0 };
+  const totals = { calls: 0, unmeteredCalls: 0, inputTokens: 0, outputTokens: 0, callMs: [] };
 
   async function ask(state, questions) {
     totals.calls++;
+    const started = Date.now();
     try {
       const { answers, usage } = await evaluate({ model, state, questions });
+      totals.callMs.push(Date.now() - started);
       totals.inputTokens += usage?.inputTokens ?? 0;
       totals.outputTokens += usage?.outputTokens ?? 0;
       return answers;
     } catch (err) {
       if (err?.name !== 'AI_InvalidResponseDataError' || !err.data) throw err;
+      totals.callMs.push(Date.now() - started);
       totals.unmeteredCalls++;
       return Object.fromEntries(Object.entries(err.data).map(([k, a]) =>
         [k, a.probabilities ? { ...a, choice: ranked(a)[0][0] } : a]));

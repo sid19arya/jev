@@ -46,3 +46,19 @@ export default {
 
 A section is `{ title, pending?, rows?: [{ prefix?, label, p, strong?, note? }], columns?: 1 | 2, more? }`.
 Shared helpers live in `../lib/wordle.mjs` (word list, scoring, `historyLines`) and `../lib/jev.mjs` (`ranked`).
+
+## Versus: all profiles side by side
+
+```powershell
+npm run versus                                        # all profiles, random word, 12 min limit
+npm run versus -- --word crane --time-limit 5
+npm run versus -- --profiles knockout,parallel-letters
+```
+
+Every profile plays the same secret word at the same time in its own Chromium window (tiled across the top of
+the screen on Windows), with a live side-by-side dashboard in the terminal. Games still running at the time
+limit are stopped and marked `timeout`. Each run is saved to `runs/versus-<stamp>/`:
+
+- `summary.md` / `summary.json`: result, accepted and rejected words, valid-word rate, Jev calls, tokens, cost, latency, time
+- `side-by-side.mp4`: all games in one video, labelled, with each result shown when that game finishes
+- `<profile>.mp4`: each game on its own; `events.jsonl`: every guess, rejection and usage update

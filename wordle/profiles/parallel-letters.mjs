@@ -18,6 +18,17 @@ const config = {
 const ALPHABET = [...'abcdefghijklmnopqrstuvwxyz'];
 const SQUARES = [0, 1, 2, 3, 4];
 
+// One option per letter for one square: color clues, plus the rejected words that had this letter in this square.
+// Without the second part each square can't tell that its own letter was part of a word the game refused.
+function describeOption(letter, pos, history, rejections) {
+  const L = letter.toUpperCase();
+  const usedHere = rejections.filter(r => r.word[pos] === letter).map(r => r.word.toUpperCase());
+  const rejectedNote = usedHere.length
+    ? ` Already used in square ${pos + 1} in ${usedHere.length} rejected word${usedHere.length === 1 ? '' : 's'}: ${usedHere.join(', ')}.`
+    : '';
+  return `${L} in square ${pos + 1}. Clues: ${describeLetterClues(letter, pos, history)}.${rejectedNote}`;
+}
+
 function buildRequest({ turn, attempt, maxAttempts, history, rejections }) {
   const state = [
     `Game: Wordle. Guess ${turn} of 6. The hidden answer is a common 5-letter English word.`,
@@ -35,8 +46,9 @@ function buildRequest({ turn, attempt, maxAttempts, history, rejections }) {
       `Choose the letter for square ${pos + 1} of 5 in the guess. ` +
       'The other four squares are chosen at the same moment by separate questions that cannot see your answer, ' +
       `so pick the letter that square ${pos + 1} most likely has in the real English word that is the answer. ` +
-      'Keep green letters in place, move yellow letters to other squares, never use grey letters, and never spell a word the game already rejected.',
-    criteria: Object.fromEntries(ALPHABET.map(l => [l, `${l.toUpperCase()} in square ${pos + 1}. Clues: ${describeLetterClues(l, pos, history)}.`])),
+      'Keep green letters in place, move yellow letters to other squares, never use grey letters, and never spell a word the game already rejected. ' +
+      `Each option notes the rejected words that already used that letter in square ${pos + 1}; those letters helped spell words the game refused.`,
+    criteria: Object.fromEntries(ALPHABET.map(l => [l, describeOption(l, pos, history, rejections)])),
   }]));
 
   return { state, questions };

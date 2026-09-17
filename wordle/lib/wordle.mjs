@@ -55,5 +55,5 @@ export function describeLetterClues(letter, pos, history) {
   if (yellowNotAt.has(pos)) notes.push(`yellow in square ${pos + 1}, so it is in the word but NOT in this square`);
   else if (yellowNotAt.size) notes.push(`yellow in square ${sq(yellowNotAt)}, so it is in the word somewhere else`);
   if (grey) notes.push('also grey once, so the word has no extra copies of it');
-  return notes.length ? notes.join('; ') : 'not tried yet';
+  return notes.length ? notes.join('; ') : 'no color clues yet';
 }

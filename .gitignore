@@ -5,4 +5,5 @@ node_modules/
 /pkmn_shwdn/videos/*
 !/pkmn_shwdn/videos/*.mp4
 /wordle/videos/
+/wordle/runs/**/*.webm
 *.log

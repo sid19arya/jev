@@ -23,9 +23,12 @@ import { getProfile } from './profiles/index.mjs';
  * @param {(e: object) => void} [o.onEvent]
  * @param {() => boolean} [o.shouldPause]  checked after each scored guess; true = wait before the next turn
  * @param {() => Promise<'next'|'auto'>} [o.waitForNext]  resolves when the user continues from outside the page (e.g. a keypress)
+ * @param {AbortSignal} [o.signal]    stops the game before its next try; the result is 'timeout'
+ * @param {string[]} [o.browserArgs]  extra Chromium flags (e.g. window position/scale when tiling windows)
+ * @param {string} [o.videoDir]       where to save the recording (default: videos/)
  */
 export async function playGame({ profile: profileName, word, headless = false, video = true, onEvent = () => {},
-  shouldPause = () => false, waitForNext } = {}) {
+  shouldPause = () => false, waitForNext, signal, browserArgs = [], videoDir = path.join(ROOT, 'videos') } = {}) {
   const profile = getProfile(profileName);
   const server = http.createServer((req, res) => {
     const pathname = new URL(req.url, 'http://x').pathname;
@@ -36,10 +39,10 @@ export async function playGame({ profile: profileName, word, headless = false, v
   await new Promise(r => server.listen(0, r));
   const url = `http://localhost:${server.address().port}/wordle.html${word ? `?word=${word}` : ''}`;
 
-  const browser = await chromium.launch({ headless });
+  const browser = await chromium.launch({ headless, args: browserArgs });
   const context = await browser.newContext({
     viewport: { width: 1100, height: 760 },
-    ...(video ? { recordVideo: { dir: path.join(ROOT, 'videos'), size: { width: 1100, height: 760 } } } : {}),
+    ...(video ? { recordVideo: { dir: videoDir, size: { width: 1100, height: 760 } } } : {}),
   });
 
   try {
@@ -119,6 +122,7 @@ export async function playGame({ profile: profileName, word, headless = false, v
       onEvent({ type: 'turn', turn, remaining: candidates.length });
 
       for (let attempt = 1; ; attempt++) {
+        if (signal?.aborted) { result = 'timeout'; break turns; }
         if (attempt > maxAttempts) { result = 'stuck'; break turns; }
         onEvent({ type: 'attempt', turn, attempt });
 
@@ -131,7 +135,11 @@ export async function playGame({ profile: profileName, word, headless = false, v
         const ctx = {
           turn, attempt, maxAttempts, history, candidates, config: profile.config,
           rejections: rejections.map(r => ({ ...r })), rejected: rejections.map(r => r.word),
-          ask: jev.ask,
+          ask: async (state, questions) => {
+            const answers = await jev.ask(state, questions);
+            onEvent({ type: 'usage', turn, attempt, ...jev.totals, cost: jev.cost() });
+            return answers;
+          },
           type,
           wait: ms => page.waitForTimeout(ms),
           show: async (sections, status = '') => {
@@ -178,7 +186,8 @@ export async function playGame({ profile: profileName, word, headless = false, v
 
     const turns = (await readBoard()).length;
     const secret = await page.evaluate(() => window.__wordleSecret);
-    await renderPanel({ won: 'Solved! 🎉', lost: 'Out of guesses', stuck: `Gave up: no accepted word after ${maxAttempts} tries` }[result]);
+    await renderPanel({ won: 'Solved! 🎉', lost: 'Out of guesses', stuck: `Gave up: no accepted word after ${maxAttempts} tries`,
+      timeout: 'Stopped: time limit' }[result]);
     await page.waitForTimeout(2000);
     const vid = page.video();
     await context.close();
